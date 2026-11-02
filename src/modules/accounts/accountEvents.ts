@@ -1,9 +1,9 @@
 import { User, type UserDoc } from "../../models/User.js";
 import type { VendorDoc } from "../../models/Vendor.js";
-import { getNotifier, type NotificationMessage, type Recipient } from "../../services/notifications/index.js";
+import { getNotifier, type NotificationMessage, type NotifyOptions, type Recipient } from "../../services/notifications/index.js";
 
 const toRecipient = (u: UserDoc): Recipient => ({ id: String(u._id), name: u.name, email: u.email });
-const send = (to: UserDoc[], m: NotificationMessage) => (to.length ? getNotifier().notify(to.map(toRecipient), m) : Promise.resolve());
+const send = (to: UserDoc[], m: NotificationMessage, options?: NotifyOptions) => (to.length ? getNotifier().notify(to.map(toRecipient), m, options) : Promise.resolve());
 
 /** A notification problem must never break the sign-up or the admin action that caused it. */
 async function safely(work: () => Promise<unknown>) {
@@ -21,7 +21,7 @@ export const notifyWelcome = (user: UserDoc) =>
       title: "Welcome to VendraMart",
       body: "Your account is ready. Shop from many Ibadan vendors in one cart and pay once. The delivery fee for each vendor is shown before you pay.",
       link: "/",
-    }),
+    }, { channels: "in-app" }),
   );
 
 /** The store owner is told the application arrived, and the admins are told there is one to review. */

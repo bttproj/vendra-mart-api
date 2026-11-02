@@ -9,6 +9,7 @@ import type { UserDoc } from "../../models/User.js";
 import { getPrivateStorage } from "../../services/storage/index.js";
 import { AppError } from "../../utils/AppError.js";
 import { classifyDocument } from "../../utils/fileType.js";
+import { storageFolder } from "../../utils/storagePaths.js";
 import { availableFilter, declinedPayoutIds } from "../earnings/earnings.service.js";
 import { notifyPayoutDeclined, notifyPayoutPaid, notifyPayoutRequested } from "./payoutEvents.js";
 
@@ -103,7 +104,7 @@ export async function payPayout(payoutId: string, admin: UserDoc, receipt: Recei
   }
 
   const storage = getPrivateStorage();
-  const stored = await storage.put(receipt.buffer, { folder: `payouts/${payoutId}`, mime: kind.mime, ext: kind.ext });
+  const stored = await storage.put(receipt.buffer, { folder: storageFolder("payouts", payoutId), mime: kind.mime, ext: kind.ext });
 
   // Guarded on status: if another admin decided it in the meantime, this loses and the upload is removed.
   const paid = await Payout.findOneAndUpdate(

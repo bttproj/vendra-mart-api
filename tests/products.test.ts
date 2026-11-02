@@ -133,11 +133,11 @@ describe("vendor product CRUD", () => {
 });
 
 describe("image upload", () => {
-  it("stores a real image under the vendor's own folder", async () => {
+  it("stores a real image under the vendramart folder, in the vendor's own folder", async () => {
     const v = await asVendor();
     const res = await v.upload(pngBytes());
     expect(res.status).toBe(201);
-    expect(res.body.data.publicId.startsWith(`vendors/${v.vendor._id}/products/`)).toBe(true);
+    expect(res.body.data.publicId.startsWith(`vendramart/vendors/${v.vendor._id}/products/`)).toBe(true);
     expect(res.body.data.url).toMatch(/^https?:\/\//);
   });
 

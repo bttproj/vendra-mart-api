@@ -2,6 +2,8 @@ export type ErrorCode =
   | "VALIDATION_ERROR"
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
+  | "EMAIL_NOT_VERIFIED"
+  | "INVALID_TOKEN"
   | "NOT_FOUND"
   | "CONFLICT"
   | "RATE_LIMITED"

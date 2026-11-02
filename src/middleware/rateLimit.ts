@@ -17,6 +17,16 @@ export const authLimiter = rateLimit({
   handler: handler("Too many attempts. Please try again in a few minutes."),
 });
 
+/** An admin writing to vendors by email: 30 an hour, which is far more than a person types and stops a mistake or a stolen session from flooding inboxes. */
+export const adminMessageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip,
+  handler: handler("You have sent a lot of messages in the last hour. Please wait a while before sending more."),
+});
+
 /** Checkout quotes call the paid maps API, so cap them per IP: 120 per hour. */
 export const quoteLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,

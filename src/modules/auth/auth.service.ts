@@ -23,6 +23,7 @@ export async function registerCustomer(input: RegisterCustomerInput): Promise<Us
     email: input.email,
     phone: input.phone,
     passwordHash: await hashPassword(input.password),
+    emailVerified: false, // confirmed later, from the link emailed to them
   });
 
   try {

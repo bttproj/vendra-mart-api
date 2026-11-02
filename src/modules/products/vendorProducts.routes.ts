@@ -10,12 +10,11 @@ import { Category } from "../../models/Category.js";
 import { Product, type ProductDoc } from "../../models/Product.js";
 import type { VendorDoc } from "../../models/Vendor.js";
 import { getImageStorage } from "../../services/storage/index.js";
+import { vendorFolderPrefixes } from "../../utils/storagePaths.js";
 import { getVendorForUser } from "../vendors/vendor.service.js";
 import { createProductSchema, idParams, updateProductSchema, vendorListQuery } from "./product.schemas.js";
 
 export const vendorProductsRouter = Router();
-
-const ownImagePrefix = (vendor: VendorDoc) => `vendors/${vendor._id}/`;
 
 /** Best-effort delete from storage. Shared placeholder photos are never in our storage, so they are skipped. */
 function removeStored(publicId: string) {
@@ -32,7 +31,8 @@ function assertCanWrite(vendor: VendorDoc) {
 function assertOwnImages(vendor: VendorDoc, images: { publicId: string }[]) {
   for (const img of images) {
     // Stand-in demo photos (placeholder/...) are shared and harmless, so any store may keep them.
-    if (!img.publicId.startsWith(ownImagePrefix(vendor)) && !img.publicId.startsWith(PLACEHOLDER_PREFIX)) {
+    const own = vendorFolderPrefixes(vendor._id).some((prefix) => img.publicId.startsWith(prefix));
+    if (!own && !img.publicId.startsWith(PLACEHOLDER_PREFIX)) {
       throw AppError.validation("One of the images was not uploaded by your store", [{ path: "images", message: "Invalid image" }]);
     }
   }

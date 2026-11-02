@@ -5,6 +5,24 @@ export interface NotificationMessage {
   body: string;
   /** App path the message points at, e.g. /vendor/orders. */
   link?: string;
+  /** Words on the button in an email. Default "Open VendraMart". */
+  cta?: string;
+  /** Where a reply to the email goes (an admin writing to a vendor, for example). */
+  replyTo?: string;
+}
+
+/** What happened to each send, for the few callers that must tell a person whether it worked. */
+export interface SendReport {
+  ok: boolean;
+  failures: { channel: string; to: string; message: string }[];
+}
+
+/**
+ * Which channels to use. "external" is email (and any later SMS) without the in-app bell, for messages that must not be
+ * stored where staff screens can read them, such as a link that signs someone in. "in-app" is the bell only.
+ */
+export interface NotifyOptions {
+  channels?: "all" | "external" | "in-app";
 }
 
 export interface Recipient {
@@ -27,13 +45,19 @@ export interface NotificationChannel {
 export class NotificationService {
   constructor(private channels: NotificationChannel[]) {}
 
-  async notify(recipients: Recipient[], message: NotificationMessage): Promise<void> {
+  async notify(recipients: Recipient[], message: NotificationMessage, options: NotifyOptions = {}): Promise<void> {
+    const report = await this.send(recipients, message, options);
+    for (const f of report.failures) console.error(`Notification via ${f.channel} to ${f.to} failed:`, f.message);
+  }
+
+  /** The same sending, but it says what failed instead of only logging it. For an action where a person needs to know. */
+  async send(recipients: Recipient[], message: NotificationMessage, { channels = "all" }: NotifyOptions = {}): Promise<SendReport> {
     const seen = new Set<string>();
     const unique = recipients.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-    const jobs = unique.flatMap((to) => this.channels.map((c) => ({ to, c })));
+    const chosen = this.channels.filter((c) => (channels === "all" ? true : channels === "in-app" ? c.name === "in-app" : c.name !== "in-app"));
+    const jobs = unique.flatMap((to) => chosen.map((c) => ({ to, c })));
     const results = await Promise.allSettled(jobs.map(({ to, c }) => c.send(to, message)));
-    results.forEach((r, i) => {
-      if (r.status === "rejected") console.error(`Notification via ${jobs[i]!.c.name} to ${jobs[i]!.to.id} failed:`, (r.reason as Error)?.message ?? r.reason);
-    });
+    const failures = results.flatMap((r, i) => (r.status === "rejected" ? [{ channel: jobs[i]!.c.name, to: jobs[i]!.to.id, message: (r.reason as Error)?.message ?? String(r.reason) }] : []));
+    return { ok: failures.length === 0, failures };
   }
 }

@@ -55,7 +55,6 @@ export const updateProfileSchema = z
       .trim()
       .max(30)
       .regex(/^[A-Za-z0-9/-]*$/, "CAC number can only have letters, numbers, / and -"),
-    logo: z.string().trim().max(500).nullable(),
   })
   .partial()
   .strict();

@@ -14,4 +14,4 @@ export function getNotifier(): NotificationService {
 }
 
 export { NotificationService } from "./NotificationService.js";
-export type { NotificationChannel, NotificationMessage, Recipient } from "./NotificationService.js";
+export type { NotificationChannel, NotificationMessage, NotifyOptions, Recipient, SendReport } from "./NotificationService.js";

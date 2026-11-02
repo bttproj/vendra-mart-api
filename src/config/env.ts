@@ -52,6 +52,11 @@ const schema = z.object({
   CLOUDINARY_CLOUD_NAME: optionalString,
   CLOUDINARY_API_KEY: optionalString,
   CLOUDINARY_API_SECRET: optionalString,
+  // Every upload goes under this folder in Cloudinary (and in the dev uploads folder): vendramart/vendors/<id>/products, vendramart/banners, ...
+  CLOUDINARY_ROOT_FOLDER: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() ? v.trim().replace(/^\/+|\/+$/g, "") : "vendramart")),
   GOOGLE_MAPS_SERVER_KEY: optionalString,
   PAYSTACK_SECRET_KEY: optionalString,
   PAYSTACK_PUBLIC_KEY: optionalString,

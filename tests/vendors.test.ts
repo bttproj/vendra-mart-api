@@ -149,6 +149,8 @@ describe("admin vendor approval", () => {
     await createUser("ADMIN", "admin@example.com");
     const admin = await loginToken("admin@example.com");
     const id = String((await Vendor.findOne())!._id);
+    // A store cannot go live before its owner has confirmed their email (the link they were sent); that rule has its own tests.
+    await User.updateOne({ email: "bodija@example.com" }, { emailVerified: true });
 
     const list = await api().get("/api/admin/vendors?status=PENDING").set("Authorization", admin);
     expect(list.body.meta.total).toBe(1);

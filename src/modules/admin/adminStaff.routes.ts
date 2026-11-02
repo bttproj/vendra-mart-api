@@ -7,6 +7,7 @@ import { created, ok } from "../../utils/respond.js";
 import { email, objectId, password, phone } from "../../utils/zodCommon.js";
 import { SubOrder } from "../../models/SubOrder.js";
 import { User, type UserDoc } from "../../models/User.js";
+import { getNotifier } from "../../services/notifications/index.js";
 import { hashPassword } from "../auth/auth.service.js";
 
 // Staff accounts are created by the Super Admin only. Today staff means Delivery Handlers.
@@ -41,6 +42,20 @@ adminStaffRouter.post(
     if (await User.exists({ email: addr })) throw AppError.conflict("An account with this email already exists.");
     // The role is fixed here, never taken from the request: this endpoint can only ever make handlers.
     const user = await User.create({ role: "HANDLER", name, email: addr, phone: tel, passwordHash: await hashPassword(pw), createdBy: req.user!._id });
+    // Tell them the account exists. The password is not in the email: the admin gives it to them directly.
+    void getNotifier()
+      .notify(
+        [{ id: String(user._id), name: user.name, email: user.email }],
+        {
+          kind: "STAFF_ACCOUNT",
+          title: "Your VendraMart delivery account is ready",
+          body: "A VendraMart administrator has created a delivery handler account for you. Sign in with this email address and the password they gave you, and you will see the deliveries assigned to you.",
+          link: "/login/",
+          cta: "Sign in",
+        },
+        { channels: "external" },
+      )
+      .catch((err) => console.error("Could not send the staff account email:", (err as Error).message));
     created(res, present(user, 0));
   }),
 );

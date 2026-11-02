@@ -22,7 +22,9 @@ const vendorSchema = new Schema(
       uploadedAt: { type: Date },
     },
     description: { type: String, trim: true, maxlength: 600 },
+    // The store's logo: the address saved here, and the id needed to delete the file from Cloudinary when it is replaced.
     logo: { type: String },
+    logoPublicId: { type: String },
     bank: {
       bankName: { type: String, required: true, trim: true, maxlength: 80 },
       accountNumber: { type: String, required: true, trim: true },

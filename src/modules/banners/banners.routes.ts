@@ -9,6 +9,7 @@ import { created, ok } from "../../utils/respond.js";
 import { objectId } from "../../utils/zodCommon.js";
 import { BANNER_PLACEMENTS, Banner, liveBannerFilter, presentBanner, publicBanner } from "../../models/Banner.js";
 import { getImageStorage } from "../../services/storage/index.js";
+import { storageFolder } from "../../utils/storagePaths.js";
 
 /** Public: the banners showing right now. */
 export const bannersRouter = Router();
@@ -82,7 +83,7 @@ adminBannersRouter.post(
   asyncHandler(async (req, res) => {
     if (!req.file) throw AppError.validation("Choose an image to upload");
     if (!detectImageKind(req.file.buffer)) throw AppError.validation("Only JPG, PNG or WebP images are allowed");
-    created(res, await getImageStorage().upload(req.file.buffer, { folder: "banners" }));
+    created(res, await getImageStorage().upload(req.file.buffer, { folder: storageFolder("banners") }));
   }),
 );
 

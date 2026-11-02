@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { email, password, phone } from "../../utils/zodCommon.js";
 
+const token = z.string().trim().min(20, "This link is not valid").max(200, "This link is not valid");
+
 export const addressInput = z.object({
   label: z.string().trim().min(1).max(40).default("Home"),
   line: z.string().trim().min(5, "Enter your delivery address").max(300),
@@ -22,6 +24,10 @@ export const loginSchema = z.object({
   email,
   password: z.string().min(1, "Enter your password").max(72),
 });
+
+export const verifyEmailSchema = z.object({ token }).strict();
+export const forgotPasswordSchema = z.object({ email }).strict();
+export const resetPasswordSchema = z.object({ token, password }).strict();
 
 export type RegisterCustomerInput = z.infer<typeof registerCustomerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -17,8 +17,8 @@ const DEFAULT_FROM = "VendraMart <no-reply@vendramart.test>";
 /** What every email channel sends for one notification: a subject, a branded HTML body and a plain-text copy. */
 function composeEmail(to: Recipient, m: NotificationMessage) {
   const url = m.link ? `${primaryClientOrigin}${m.link}` : primaryClientOrigin;
-  const { html, text } = renderEmail({ name: to.name, title: m.title, body: m.body, url, origin: primaryClientOrigin });
-  return { subject: m.title, html, text };
+  const { html, text } = renderEmail({ name: to.name, title: m.title, body: m.body, url, origin: primaryClientOrigin, ctaLabel: m.cta });
+  return { subject: m.title, html, text, ...(m.replyTo ? { replyTo: m.replyTo } : {}) };
 }
 
 /**
@@ -48,6 +48,12 @@ export class EmailChannel implements NotificationChannel {
   }
 }
 
+/** Resend names the reply address `reply_to`. */
+function resendBody(from: string, to: Recipient, m: NotificationMessage) {
+  const { replyTo, ...mail } = composeEmail(to, m);
+  return { from, to: [to.email], ...mail, ...(replyTo ? { reply_to: replyTo } : {}) };
+}
+
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 /**
@@ -73,7 +79,7 @@ export class ResendChannel implements NotificationChannel {
         method: "POST",
         signal: controller.signal,
         headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: this.from, to: [to.email], ...composeEmail(to, m) }),
+        body: JSON.stringify(resendBody(this.from, to, m)),
       });
     } catch {
       throw new Error("Resend could not be reached");

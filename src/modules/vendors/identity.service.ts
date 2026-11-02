@@ -4,6 +4,7 @@ import { ok } from "../../utils/respond.js";
 import { classifyDocument } from "../../utils/fileType.js";
 import type { VendorDoc } from "../../models/Vendor.js";
 import { getPrivateStorage } from "../../services/storage/index.js";
+import { storageFolder } from "../../utils/storagePaths.js";
 import { assertNinFree } from "./vendor.service.js";
 
 // A vendor's NIN and the slip that backs it up. The slip is a private file (never a public address): it is stored the
@@ -30,7 +31,7 @@ export async function saveNinSlip(vendor: VendorDoc, buffer: Buffer) {
   if (!kind) throw AppError.validation("Upload the NIN slip as an image (JPG, PNG, WebP) or a PDF", [{ path: "file", message: "The NIN slip must be an image or a PDF" }]);
 
   const storage = getPrivateStorage();
-  const stored = await storage.put(buffer, { folder: `vendors/${vendor._id}/identity`, mime: kind.mime, ext: kind.ext });
+  const stored = await storage.put(buffer, { folder: storageFolder("vendors", vendor._id, "identity"), mime: kind.mime, ext: kind.ext });
   const previous = vendor.ninSlip?.publicId ? { id: vendor.ninSlip.publicId, type: vendor.ninSlip.resourceType ?? undefined } : null;
 
   vendor.ninSlip = { publicId: stored.publicId, mime: kind.mime, resourceType: stored.resourceType, uploadedAt: new Date() };

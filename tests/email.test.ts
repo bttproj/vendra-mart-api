@@ -128,11 +128,12 @@ async function waitFor(check: () => boolean | Promise<boolean>, ms = 3000) {
 }
 
 describe("account emails", () => {
-  it("welcomes a new customer, in the bell and by email", async () => {
+  it("welcomes a new customer in the bell, and emails them one message that welcomes them and asks them to confirm", async () => {
     const res = await api().post("/api/auth/register").send(customerBody({ email: "new@example.com" }));
     expect(res.status).toBe(201);
     expect(await waitFor(() => emailLog.to("new@example.com").length === 1)).toBe(true);
-    expect(emailLog.to("new@example.com")[0]).toMatchObject({ title: "Welcome to VendraMart", link: "/" });
+    expect(emailLog.to("new@example.com")[0]).toMatchObject({ kind: "VERIFY_EMAIL", title: expect.stringContaining("Welcome to VendraMart") });
+    expect(emailLog.to("new@example.com")[0]!.link).toMatch(/^\/verify-email\/\?token=/);
     const user = (await User.findOne({ email: "new@example.com" }))!;
     expect(await waitFor(async () => (await Notification.countDocuments({ userId: user._id, kind: "WELCOME" })) === 1)).toBe(true);
   });
@@ -151,8 +152,9 @@ describe("account emails", () => {
     const res = await api().post("/api/auth/vendor/register").send(vendorBody({ email: "owner@example.com", businessName: "Kemi Spices" }));
     expect(res.status).toBe(201);
 
-    expect(await waitFor(() => emailLog.to("owner@example.com").length === 1)).toBe(true);
-    expect(emailLog.to("owner@example.com")[0]).toMatchObject({ title: "We received your store application", link: "/vendor/" });
+    expect(await waitFor(() => emailLog.to("owner@example.com").length === 2)).toBe(true);
+    expect(emailLog.to("owner@example.com").find((m) => m.kind === "VENDOR_APPLIED")).toMatchObject({ title: "We received your store application", link: "/vendor/" });
+    expect(emailLog.to("owner@example.com").some((m) => m.kind === "VERIFY_EMAIL")).toBe(true);
     expect(await waitFor(() => emailLog.to(admin.email).length === 1)).toBe(true);
     const vendor = (await Vendor.findOne({ businessName: "Kemi Spices" }))!;
     expect(emailLog.to(admin.email)[0]).toMatchObject({ title: "New store to review: Kemi Spices", link: `/admin/vendors/?id=${vendor._id}` });

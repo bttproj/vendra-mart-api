@@ -6,6 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { escapeRegex, objectId, pagination } from "../../utils/zodCommon.js";
 import { Product } from "../../models/Product.js";
+import { User } from "../../models/User.js";
 import { Vendor, VENDOR_STATUSES, type VendorDoc } from "../../models/Vendor.js";
 import { suspendSchema } from "./vendor.schemas.js";
 import { notifyVendorDecision } from "../accounts/accountEvents.js";
@@ -15,7 +16,7 @@ import { sendNinSlip } from "./identity.service.js";
 export const adminVendorsRouter = Router();
 
 /** Admin sees everything needed to review a store, including CAC and the full account number. */
-const present = (v: VendorDoc, productCount?: number) => ({
+const present = (v: VendorDoc, productCount?: number, ownerEmailVerified?: boolean) => ({
   id: String(v._id),
   slug: v.slug,
   businessName: v.businessName,
@@ -34,6 +35,8 @@ const present = (v: VendorDoc, productCount?: number) => ({
   bank: { bankName: v.bank!.bankName, accountNumber: v.bank!.accountNumber, accountName: v.bank!.accountName },
   pickup: { line: v.pickup!.line, lat: v.pickup!.lat, lng: v.pickup!.lng, cityId: String(v.pickup!.cityId) },
   ...(productCount === undefined ? {} : { productCount }),
+  // Whether the owner has confirmed their email address. A store cannot be approved until they have.
+  ...(ownerEmailVerified === undefined ? {} : { ownerEmailVerified }),
 });
 
 adminVendorsRouter.get(
@@ -66,7 +69,8 @@ adminVendorsRouter.get(
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
     const vendor = await findVendor(req.validated.params.id);
-    ok(res, present(vendor, await Product.countDocuments({ vendorId: vendor._id })));
+    const [productCount, owner] = await Promise.all([Product.countDocuments({ vendorId: vendor._id }), User.findById(vendor.userId)]);
+    ok(res, present(vendor, productCount, owner?.emailVerified ?? true));
   }),
 );
 
@@ -84,6 +88,10 @@ adminVendorsRouter.post(
   validate({ params: z.object({ id: objectId }) }),
   asyncHandler(async (req, res) => {
     const vendor = await findVendor(req.validated.params.id);
+    const owner = await User.findById(vendor.userId);
+    if (owner && !owner.emailVerified) {
+      throw new AppError(409, "EMAIL_NOT_VERIFIED", "This store owner has not confirmed their email address yet. Ask them to use the link we emailed, then approve the store.");
+    }
     vendor.status = "APPROVED";
     vendor.statusReason = undefined;
     vendor.approvedAt = vendor.approvedAt ?? new Date();

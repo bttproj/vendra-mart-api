@@ -97,7 +97,7 @@ describe("uploading the NIN slip", () => {
     expect(res.body.data).toMatchObject({ hasNinSlip: true });
     const stored = (await Vendor.findById(o.vendor._id))!;
     expect(stored.ninSlip).toMatchObject({ mime: "image/png" });
-    expect(stored.ninSlip!.publicId).toMatch(/^vendors\/.+\/identity\//);
+    expect(stored.ninSlip!.publicId).toMatch(/^vendramart\/vendors\/.+\/identity\//);
     expect(storage.files.size).toBe(1);
     expect(JSON.stringify(res.body)).not.toContain(stored.ninSlip!.publicId!);
   });

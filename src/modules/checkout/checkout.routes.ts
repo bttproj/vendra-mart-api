@@ -5,6 +5,7 @@ import { paymentLimiter, quoteLimiter } from "../../middleware/rateLimit.js";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { created, ok } from "../../utils/respond.js";
+import { AppError } from "../../utils/AppError.js";
 import { objectId } from "../../utils/zodCommon.js";
 import { presentLine, resolveCart } from "./cart.service.js";
 import { buildQuote, publicQuote } from "./checkout.service.js";
@@ -46,6 +47,9 @@ checkoutRouter.post(
   validate({ body: z.object({ items: itemsSchema, addressId: objectId }).strict() }),
   asyncHandler(async (req, res) => {
     const { items, addressId } = req.validated.body;
+    if (!req.user!.emailVerified) {
+      throw new AppError(403, "EMAIL_NOT_VERIFIED", "Please confirm your email address before placing an order. We sent you a link when you signed up, and you can ask for another one from the banner at the top of the page.");
+    }
     const { order, authorizationUrl } = await createOrder(req.user!, items, addressId);
     created(res, {
       orderId: String(order._id),

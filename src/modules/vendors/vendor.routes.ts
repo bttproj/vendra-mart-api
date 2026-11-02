@@ -45,9 +45,8 @@ vendorRouter.patch(
   validate({ body: updateProfileSchema }),
   asyncHandler(async (req, res) => {
     const vendor = await getVendorForUser(req.user!._id);
-    const { logo, ...rest } = req.validated.body;
-    Object.assign(vendor, rest);
-    if (logo !== undefined) vendor.logo = logo ?? undefined;
+    // The logo is changed only by uploading one (POST /vendor/uploads/logo), so it is always a file in our Cloudinary folder.
+    Object.assign(vendor, req.validated.body);
     await vendor.save();
     ok(res, ownVendor(vendor));
   }),
