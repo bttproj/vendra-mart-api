@@ -410,10 +410,13 @@ describe("staff accounts", () => {
     expect(login.body.data).toMatchObject({ home: "/handler", user: { role: "HANDLER" } });
   });
 
-  it("can only ever create handlers: a role in the request is rejected", async () => {
+  it("makes a handler unless an administrator is asked for, and no other role can be made here", async () => {
     const admin = asUser((await createAdmin()).bearer);
-    expect((await admin.post("/admin/staff", body({ role: "ADMIN" }))).status).toBe(422);
+    for (const role of ["CUSTOMER", "VENDOR", "admin", "SUPERUSER", "", null]) {
+      expect((await admin.post("/admin/staff", body({ role }))).status, String(role)).toBe(422);
+    }
     expect(await User.countDocuments({ email: "femi@example.com" })).toBe(0);
+    expect((await admin.post("/admin/staff", body({ role: "HANDLER" }))).body.data.role).toBe("HANDLER");
   });
 
   it("rejects duplicates and weak input", async () => {
@@ -431,7 +434,7 @@ describe("staff accounts", () => {
     await admin.post(`/admin/sub-orders/${o.bodijaSub._id}/assign`, { handlerId: String(rider.user._id) });
     await admin.post(`/admin/sub-orders/${o.ojabaSub._id}/assign`, { handlerId: String(rider.user._id) });
     const list = await admin.get("/admin/staff");
-    expect(list.body.data).toEqual([expect.objectContaining({ email: rider.email, activeDeliveries: 2 })]);
+    expect(list.body.data.find((m: { email: string }) => m.email === rider.email)).toMatchObject({ role: "HANDLER", activeDeliveries: 2 });
   });
 
   it("deactivating a handler stops new logins and ends the current session at once", async () => {
@@ -446,14 +449,15 @@ describe("staff accounts", () => {
     expect((await api().post("/api/auth/login").send({ email: rider.email, password: PASSWORD })).status).toBe(200);
   });
 
-  it("cannot be used to change a customer, vendor or another admin", async () => {
+  it("cannot be used to change a customer or a vendor", async () => {
     const admin = await createAdmin();
     const customer = await createUser("CUSTOMER", "c@example.com");
-    for (const id of [customer._id, admin.user._id]) {
+    const vendor = await createUser("VENDOR", "v@example.com");
+    for (const id of [customer._id, vendor._id]) {
       expect((await asUser(admin.bearer).patch(`/admin/staff/${id}`, { isActive: false })).status).toBe(404);
     }
     expect((await User.findById(customer._id))!.isActive).toBe(true);
-    expect((await User.findById(admin.user._id))!.isActive).toBe(true);
+    expect((await User.findById(vendor._id))!.isActive).toBe(true);
   });
 
   it("is for admins only", async () => {

@@ -17,6 +17,9 @@ import { ordersRouter } from "./modules/orders/orders.routes.js";
 import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
 import { receiptRouter } from "./modules/payouts/receipt.routes.js";
 import { mountPaystackWebhook } from "./modules/orders/webhook.routes.js";
+import mongoose from "mongoose";
+import { requestLog } from "./middleware/requestLog.js";
+import { asyncHandler } from "./utils/asyncHandler.js";
 import { ok } from "./utils/respond.js";
 
 export function createApp() {
@@ -28,6 +31,8 @@ export function createApp() {
 
   // The website is on another address, and shows images this API serves in development, so they must be loadable cross-origin.
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+  if (isProd) app.use(requestLog);
+
   // The website is a static site on its own address, so the browser calls this API cross-origin. Signing in is a JWT sent
   // in the Authorization header, so no cookie or credentials mode is involved.
   app.use(cors({ origin: clientOrigins, maxAge: 86400 }));
@@ -43,7 +48,21 @@ export function createApp() {
   }
 
   const api = express.Router();
+  // /health says the process is up. /health/ready also checks the database, so a host can stop sending traffic to a
+  // server that has lost it (and start it again) instead of serving errors.
   api.get("/health", (_req, res) => ok(res, { status: "ok" }));
+  api.get(
+    "/health/ready",
+    asyncHandler(async (_req, res) => {
+      try {
+        if (mongoose.connection.readyState !== 1) throw new Error("not connected");
+        await mongoose.connection.db!.admin().ping();
+        ok(res, { status: "ready" });
+      } catch {
+        res.status(503).json({ success: false, error: { code: "SERVICE_UNAVAILABLE", message: "The database is not reachable" } });
+      }
+    }),
+  );
   api.use(referenceRouter);
   api.use(bannersRouter);
   api.use(catalogRouter);
