@@ -10,7 +10,7 @@ const GOOD: CheckedSettings = {
   CLIENT_ORIGIN: "https://www.vendramart.com,https://vendramart.com",
   JWT_SECRET: "k3Jf9QpLz2Vx8TnA5wRb7YcHd1MsGe6UoXi4NqPvZtBa0DyCfWjSlEhKrOmIuT3g",
   JWT_EXPIRES_IN_DAYS: 7,
-  PAYSTACK_SECRET_KEY: ""sk_live_" + "x".repeat(32)",
+  PAYSTACK_SECRET_KEY: "sk_live_" + "x".repeat(32),
   GOOGLE_MAPS_SERVER_KEY: "maps-server-key",
   CLOUDINARY_CLOUD_NAME: "vendramart",
   CLOUDINARY_API_KEY: "123",

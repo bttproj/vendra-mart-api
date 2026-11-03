@@ -15,6 +15,8 @@ const settingsSchema = new Schema(
     minDeliveryFeeKobo: { type: Number, min: 0, validate: isIntOrNull, default: null },
     // Platform commission in basis points: 1000 = 10%.
     commissionBps: { type: Number, required: true, min: 0, max: 10000, validate: isInt, default: 1000 },
+    // Whether a vendor must give a NIN to register. The admin can switch this off; the NIN is then optional until it is switched on again.
+    requireNin: { type: Boolean, default: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
@@ -28,6 +30,12 @@ export interface PricingSettings {
   pricePerKmKobo: number;
   minDeliveryFeeKobo: number | null;
   commissionBps: number;
+}
+
+/** Is a NIN required of new vendors right now? Required unless the admin has switched it off. */
+export async function getRequireNin(): Promise<boolean> {
+  const doc = await Settings.findOne({ key: "singleton" });
+  return doc?.requireNin ?? true;
 }
 
 /** Reads the pricing, creating the defaults (N200 per km, no minimum, 10%) on first use. Safe under concurrency. */

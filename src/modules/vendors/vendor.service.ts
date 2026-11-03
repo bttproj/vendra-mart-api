@@ -4,6 +4,7 @@ import { Vendor, type VendorDoc } from "../../models/Vendor.js";
 import { Product } from "../../models/Product.js";
 import { AppError } from "../../utils/AppError.js";
 import { uniqueSlug } from "../../utils/slug.js";
+import { getRequireNin } from "../../models/Settings.js";
 import { hashPassword } from "../auth/auth.service.js";
 import { requireActiveCityForPoint } from "../cities/cities.service.js";
 import type { RegisterVendorInput } from "./vendor.schemas.js";
@@ -13,7 +14,8 @@ export async function registerVendor(input: RegisterVendorInput): Promise<{ user
   if (await User.exists({ email: input.email })) {
     throw AppError.conflict("An account with this email already exists. Try signing in.");
   }
-  await assertNinFree(input.nin);
+  if (input.nin) await assertNinFree(input.nin);
+  else if (await getRequireNin()) throw AppError.validation("Enter your NIN", [{ path: "nin", message: "Your NIN is 11 digits" }]);
   // Fail on a bad pin before creating anything.
   const city = await requireActiveCityForPoint(input.pickup, "pickup address");
 

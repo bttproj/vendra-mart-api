@@ -1,14 +1,17 @@
+import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { AppError } from "../../utils/AppError.js";
-import { ok } from "../../utils/respond.js";
+import { created, ok } from "../../utils/respond.js";
 import { escapeRegex, objectId, pagination } from "../../utils/zodCommon.js";
 import { Product } from "../../models/Product.js";
 import { User } from "../../models/User.js";
 import { Vendor, VENDOR_STATUSES, type VendorDoc } from "../../models/Vendor.js";
-import { suspendSchema } from "./vendor.schemas.js";
+import { adminCreateVendorSchema, suspendSchema } from "./vendor.schemas.js";
+import { sendAccountInviteEmail } from "../auth/emailTokens.service.js";
+import { registerVendor } from "./vendor.service.js";
 import { notifyVendorDecision } from "../accounts/accountEvents.js";
 import { sendNinSlip } from "./identity.service.js";
 
@@ -55,6 +58,20 @@ adminVendorsRouter.get(
       Vendor.countDocuments(filter),
     ]);
     ok(res, items.map((v) => present(v)), { page, limit, total });
+  }),
+);
+
+// The admin creates a store for someone. The owner gets an email to choose their own password (which also confirms the
+// address), and the store then waits for approval like any other, because approval needs a confirmed email.
+adminVendorsRouter.post(
+  "/",
+  validate({ body: adminCreateVendorSchema }),
+  asyncHandler(async (req, res) => {
+    // Never shown or sent: only here because an account needs one. The owner replaces it from the emailed link.
+    const password = `${randomBytes(18).toString("base64url")}a1`;
+    const { user, vendor } = await registerVendor({ ...req.validated.body, password });
+    void sendAccountInviteEmail(user);
+    created(res, present(vendor));
   }),
 );
 

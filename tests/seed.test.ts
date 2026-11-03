@@ -101,7 +101,7 @@ describe("the starting data set", () => {
     expect(o.deliveries.needsHandler).toBe(1);
     expect(o.deliveries.inProgress).toBeGreaterThanOrEqual(3);
     expect(o.vendors.approved).toBe(2);
-    expect(o.last7Days.reduce((n: number, d: { orders: number }) => n + d.orders, 0)).toBeGreaterThanOrEqual(8); // a finished order can be just over 6 days old, near the edge of the window
+    expect(o.last7Days.reduce((n: number, d: { orders: number }) => n + d.orders, 0)).toBeGreaterThanOrEqual(4); // the 4 recent orders are always inside the window; a finished one is older (it waits out the 4 working day hold) and can fall just outside it, on a Tuesday or early on a Wednesday
   });
 
   it("shows the seeded orders to the customer, with the handler only on the deliveries assigned to them", async () => {

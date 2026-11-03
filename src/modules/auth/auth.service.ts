@@ -61,6 +61,20 @@ export async function authenticate({ email, password }: LoginInput): Promise<Use
   return user;
 }
 
+/** A signed-in person changes their own password. They must know the current one, so a borrowed session cannot lock them out. */
+export async function changePassword(userId: UserDoc["_id"], currentPassword: string, newPassword: string): Promise<UserDoc> {
+  const user = await User.findById(userId).select("+passwordHash");
+  if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw AppError.validation("Your current password is not right", [{ path: "currentPassword", message: "That is not your current password" }]);
+  }
+  if (currentPassword === newPassword) {
+    throw AppError.validation("Choose a different password", [{ path: "newPassword", message: "Your new password must be different from the current one" }]);
+  }
+  user.passwordHash = await hashPassword(newPassword);
+  await user.save();
+  return user;
+}
+
 /** Where each role lands after sign in. Used by the client for redirects too. */
 export const ROLE_HOME = {
   CUSTOMER: "/",

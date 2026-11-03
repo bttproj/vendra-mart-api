@@ -8,11 +8,18 @@ import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { kobo, objectId } from "../../utils/zodCommon.js";
 import { City, publicCity } from "../../models/City.js";
-import { Settings, getPricing } from "../../models/Settings.js";
+import { Settings, getPricing, getRequireNin } from "../../models/Settings.js";
 import { Vendor } from "../../models/Vendor.js";
 
 // Mounted under /api/admin, behind requireRole("ADMIN").
 export const adminSettingsRouter = Router();
+
+// Public: the vendor sign-up and settings screens ask whether a NIN is required. Nothing private is in the answer.
+export const vendorRulesRouter = Router();
+vendorRulesRouter.get(
+  "/vendor-rules",
+  asyncHandler(async (_req, res) => ok(res, { requireNin: await getRequireNin() })),
+);
 
 /** Hard ceilings that catch a typo (an extra zero) before it reaches customers. */
 const MAX_PRICE_PER_KM_KOBO = 1_000_000; // N10,000 per km
@@ -28,11 +35,12 @@ const pricingBody = z
   .strict();
 
 async function present() {
-  const [pricing, doc, cities] = await Promise.all([getPricing(), Settings.findOne({ key: "singleton" }), City.find().sort({ sortOrder: 1, name: 1 })]);
+  const [pricing, doc, cities, requireNin] = await Promise.all([getPricing(), Settings.findOne({ key: "singleton" }), City.find().sort({ sortOrder: 1, name: 1 }), getRequireNin()]);
   const counts = await Vendor.aggregate<{ _id: unknown; n: number }>([{ $match: { status: "APPROVED" } }, { $group: { _id: "$pickup.cityId", n: { $sum: 1 } } }]);
   const byCity = new Map(counts.map((c) => [String(c._id), c.n]));
   return {
     pricing,
+    vendorRules: { requireNin },
     updatedAt: doc?.updatedAt ?? null,
     cities: cities.map((c) => ({ ...publicCity(c), vendorCount: byCity.get(String(c._id)) ?? 0 })),
   };
@@ -46,6 +54,16 @@ adminSettingsRouter.put(
   asyncHandler(async (req, res) => {
     await getPricing(); // make sure the document exists
     await Settings.updateOne({ key: "singleton" }, { $set: { ...req.validated.body, updatedBy: req.user!._id } });
+    ok(res, await present());
+  }),
+);
+
+adminSettingsRouter.put(
+  "/settings/vendor-rules",
+  validate({ body: z.object({ requireNin: z.boolean() }).strict() }),
+  asyncHandler(async (req, res) => {
+    await getPricing(); // make sure the document exists
+    await Settings.updateOne({ key: "singleton" }, { $set: { requireNin: req.validated.body.requireNin, updatedBy: req.user!._id } });
     ok(res, await present());
   }),
 );

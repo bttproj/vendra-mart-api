@@ -41,8 +41,12 @@ export const registerVendorSchema = z.object({
     .transform((v) => (v ? v : undefined)),
   pickup,
   bank,
-  nin,
+  // Required or optional depending on the admin's setting, which the service checks.
+  nin: nin.optional(),
 });
+
+/** The admin creates a store for someone: the same details, but no password. The owner chooses theirs from an emailed link. */
+export const adminCreateVendorSchema = registerVendorSchema.omit({ password: true }).strict();
 
 export const updateProfileSchema = z
   .object({

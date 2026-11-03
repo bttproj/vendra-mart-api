@@ -5,9 +5,9 @@ import { validate } from "../../middleware/validate.js";
 import { authLimiter } from "../../middleware/rateLimit.js";
 import { requireAuth, signToken } from "../../middleware/auth.js";
 import { publicUser, type UserDoc } from "../../models/User.js";
-import { forgotPasswordSchema, loginSchema, registerCustomerSchema, resetPasswordSchema, verifyEmailSchema } from "./auth.schemas.js";
-import { requestPasswordReset, resendVerification, resetPassword, sendVerificationEmail, verifyEmail } from "./emailTokens.service.js";
-import { ROLE_HOME, authenticate, registerCustomer } from "./auth.service.js";
+import { changePasswordSchema, forgotPasswordSchema, loginSchema, registerCustomerSchema, resetPasswordSchema, verifyEmailSchema } from "./auth.schemas.js";
+import { requestPasswordReset, resendVerification, resetPassword, sendPasswordChangedEmail, sendVerificationEmail, verifyEmail } from "./emailTokens.service.js";
+import { ROLE_HOME, authenticate, changePassword, registerCustomer } from "./auth.service.js";
 import { registerVendorSchema } from "../vendors/vendor.schemas.js";
 import { registerVendor } from "../vendors/vendor.service.js";
 import { notifyVendorApplied, notifyWelcome } from "../accounts/accountEvents.js";
@@ -92,6 +92,19 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     await resetPassword(req.validated.body.token, req.validated.body.password);
     ok(res, { reset: true });
+  }),
+);
+
+// A signed-in person changes their password. Limited like sign-in, because it checks the current password.
+authRouter.post(
+  "/change-password",
+  authLimiter,
+  requireAuth,
+  validate({ body: changePasswordSchema }),
+  asyncHandler(async (req, res) => {
+    const user = await changePassword(req.user!._id, req.validated.body.currentPassword, req.validated.body.newPassword);
+    void sendPasswordChangedEmail(user);
+    ok(res, { changed: true });
   }),
 );
 

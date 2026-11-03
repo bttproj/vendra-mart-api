@@ -12,6 +12,8 @@ import { hashPassword } from "./auth.service.js";
 const HOUR = 3_600_000;
 export const VERIFY_TTL_MS = 24 * HOUR;
 export const RESET_TTL_MS = 1 * HOUR;
+/** An account made for someone by the admin: they get a week to follow the link and choose a password. */
+export const INVITE_TTL_MS = 7 * 24 * HOUR;
 /** Asking for another email sooner than this after the last one is refused, so the button cannot be used to flood an inbox. */
 export const RESEND_COOLDOWN_MS = 60_000;
 
@@ -105,6 +107,26 @@ export async function requestPasswordReset(email: string): Promise<void> {
   }
 }
 
+/** Emails the owner of an account the admin created a link to choose their password (and so confirm the address). Never throws. */
+export async function sendAccountInviteEmail(user: UserDoc, what = "store"): Promise<void> {
+  try {
+    const token = await issueToken(user._id, "RESET_PASSWORD", INVITE_TTL_MS);
+    await getNotifier().notify(
+      [recipient(user)],
+      {
+        kind: "RESET_PASSWORD",
+        title: `Your VendraMart ${what} account is ready`,
+        body: `The VendraMart team has set up a ${what} account for you. Use the button to choose your password and sign in.\n\nThe link works for 7 days and can be used once. After that, use "Forgot your password?" on the sign-in page.`,
+        link: `/reset-password/?token=${token}`,
+        cta: "Choose my password",
+      },
+      { channels: "external" },
+    );
+  } catch (err) {
+    console.error("Could not send the account invitation email:", (err as Error).message);
+  }
+}
+
 export async function resetPassword(token: string, newPassword: string, now = new Date()): Promise<void> {
   const user = await consumeToken(token, "RESET_PASSWORD", now);
   if (!user || !user.isActive) throw invalidLink();
@@ -117,6 +139,11 @@ export async function resetPassword(token: string, newPassword: string, now = ne
   await user.save();
   // Any other reset link still out there is cancelled.
   await EmailToken.deleteMany({ userId: user._id, purpose: "RESET_PASSWORD", usedAt: { $exists: false } });
+  await sendPasswordChangedEmail(user);
+}
+
+/** Tells the owner their password was just changed, so a change they did not make is noticed. Never throws. */
+export async function sendPasswordChangedEmail(user: UserDoc): Promise<void> {
   try {
     await getNotifier().notify(
       [recipient(user)],

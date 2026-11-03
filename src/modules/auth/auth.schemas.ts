@@ -29,5 +29,7 @@ export const verifyEmailSchema = z.object({ token }).strict();
 export const forgotPasswordSchema = z.object({ email }).strict();
 export const resetPasswordSchema = z.object({ token, password }).strict();
 
+export const changePasswordSchema = z.object({ currentPassword: z.string().min(1, "Enter your current password").max(72), newPassword: password }).strict();
+
 export type RegisterCustomerInput = z.infer<typeof registerCustomerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

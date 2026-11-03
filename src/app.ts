@@ -8,6 +8,7 @@ import { adminRouter, customerRouter, handlerRouter } from "./modules/roleShells
 import { vendorRouter } from "./modules/vendors/vendor.routes.js";
 import { bannersRouter } from "./modules/banners/banners.routes.js";
 import { referenceRouter } from "./modules/cities/cities.routes.js";
+import { vendorRulesRouter } from "./modules/admin/adminSettings.routes.js";
 import { catalogRouter } from "./modules/products/catalog.routes.js";
 import { cartRouter, checkoutRouter } from "./modules/checkout/checkout.routes.js";
 import { LOCAL_UPLOAD_ROOT, LOCAL_URL_PREFIX } from "./services/storage/LocalDiskStorage.js";
@@ -64,6 +65,7 @@ export function createApp() {
     }),
   );
   api.use(referenceRouter);
+  api.use(vendorRulesRouter);
   api.use(bannersRouter);
   api.use(catalogRouter);
   api.use("/cart", cartRouter);
