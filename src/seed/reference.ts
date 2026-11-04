@@ -12,7 +12,7 @@ const CITIES = [
 ];
 
 // Categories from the storefront screen.
-const CATEGORIES = [
+export const CATEGORIES = [
   "Grains & flour",
   "Oils & condiments",
   "Tubers & produce",
@@ -29,6 +29,9 @@ export const slugify = (s: string) =>
     .replace(/['’]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+/** The slugs of the starter categories. The seed adds them back if they are missing, so they cannot be deleted. */
+export const STARTER_CATEGORY_SLUGS: string[] = CATEGORIES.map((n) => slugify(n));
 
 /**
  * Idempotent. Inserts missing cities/categories only, and never overwrites an existing city's
