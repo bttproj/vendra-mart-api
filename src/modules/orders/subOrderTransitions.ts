@@ -27,6 +27,7 @@ const EVENT_FOR: Partial<Record<OrderStatus, SubOrderEvent>> = {
   DELIVERED: "DELIVERED",
   FAILED_DELIVERY: "FAILED_DELIVERY",
   CANCELLED: "CANCELLED",
+  COMPLETED: "COMPLETED",
 };
 
 /**

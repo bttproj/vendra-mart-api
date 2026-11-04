@@ -4,6 +4,7 @@ import type { VendorDoc } from "../../models/Vendor.js";
 import { getNotifier, type NotificationMessage, type Recipient } from "../../services/notifications/index.js";
 import { formatNaira } from "../../utils/formatNaira.js";
 import { adminPayoutPage } from "../../utils/webLinks.js";
+import { notifyDesks, notifyTeam } from "../accounts/team.js";
 
 const toRecipient = (u: UserDoc): Recipient => ({ id: String(u._id), name: u.name, email: u.email });
 const send = (to: UserDoc[], m: NotificationMessage) => (to.length ? getNotifier().notify(to.map(toRecipient), m) : Promise.resolve());
@@ -19,12 +20,16 @@ async function safely(work: () => Promise<unknown>) {
 
 export const notifyPayoutRequested = (payout: PayoutDoc, vendor: VendorDoc) =>
   safely(async () =>
-    send(await User.find({ role: "ADMIN", isActive: true }), {
-      kind: "PAYOUT_REQUESTED",
-      title: `Payout request ${payout.number}`,
-      body: `${vendor.businessName} asked for ${formatNaira(payout.amountKobo)} across ${payout.subOrderIds.length} ${payout.subOrderIds.length === 1 ? "order" : "orders"}.`,
-      link: adminPayoutPage(payout._id),
-    }),
+    notifyTeam(
+      "payouts",
+      {
+        kind: "PAYOUT_REQUESTED",
+        title: `Payout request ${payout.number}`,
+        body: `${vendor.businessName} asked for ${formatNaira(payout.amountKobo)} across ${payout.subOrderIds.length} ${payout.subOrderIds.length === 1 ? "order" : "orders"}.`,
+        link: adminPayoutPage(payout._id),
+      },
+      { vendorDesk: true },
+    ),
   );
 
 export const notifyPayoutPaid = (payout: PayoutDoc, vendor: VendorDoc) =>
@@ -38,6 +43,7 @@ export const notifyPayoutPaid = (payout: PayoutDoc, vendor: VendorDoc) =>
         link: "/vendor/earnings",
       });
     }
+    await notifyDesks({ kind: "TEAM_PAYOUT_PAID", title: `Payout ${payout.number} paid`, body: `${formatNaira(payout.amountKobo)} was transferred to ${vendor.businessName}.`, link: adminPayoutPage(payout._id) }, { vendorDesk: true });
   });
 
 export const notifyPayoutDeclined = (payout: PayoutDoc, vendor: VendorDoc) =>
@@ -51,4 +57,5 @@ export const notifyPayoutDeclined = (payout: PayoutDoc, vendor: VendorDoc) =>
         link: "/vendor/earnings",
       });
     }
+    await notifyDesks({ kind: "TEAM_PAYOUT_DECLINED", title: `Payout ${payout.number} declined`, body: `${vendor.businessName}: ${payout.declineReason}.`, link: adminPayoutPage(payout._id) }, { vendorDesk: true });
   });

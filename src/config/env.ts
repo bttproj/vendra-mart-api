@@ -69,6 +69,10 @@ const schema = z.object({
   // For email through Resend (https://resend.com). When set, notification emails go through Resend instead of SMTP.
   RESEND_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
+  // Shared mailboxes that get a copy of what happens on the site: every activity to admin@, vendor and sales ones also to vendors@.
+  // They default to admin@vendramart.com and vendors@vendramart.com (nothing in tests). Set to "off" to stop those emails.
+  ADMIN_NOTIFY_EMAIL: optionalString,
+  VENDOR_NOTIFY_EMAIL: optionalString,
 });
 
 const parsed = schema.safeParse(process.env);

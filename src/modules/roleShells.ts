@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireRole } from "../middleware/auth.js";
+import { requirePermission, requireRole, requireSuperAdmin } from "../middleware/auth.js";
 import { ok } from "../utils/respond.js";
 import { adminBannersRouter } from "./banners/banners.routes.js";
 import { adminCategoriesRouter } from "./admin/adminCategories.routes.js";
@@ -22,6 +22,20 @@ import { adminSettingsRouter } from "./admin/adminSettings.routes.js";
 export const adminRouter = Router();
 adminRouter.use(requireRole("ADMIN"));
 adminRouter.get("/ping", (req, res) => ok(res, { area: "admin", userId: String(req.user!._id) }));
+
+// A super admin passes every guard below. A staff member (operations manager, finance manager...) passes only the areas the
+// super admin gave them. Each guard lists the address prefixes it covers, so routers mounted at the root stay separate.
+adminRouter.delete(["/customers/:id", "/vendors/:id", "/staff/:id"], requireSuperAdmin);
+adminRouter.use("/vendors", requirePermission("vendors"));
+adminRouter.use(["/banners", "/categories"], requirePermission("catalog"));
+adminRouter.use("/payouts", requirePermission("payouts"));
+adminRouter.use("/overview", requirePermission("overview"));
+adminRouter.use("/orders", requirePermission("orders"));
+adminRouter.use("/customers", requirePermission("customers"));
+adminRouter.use(["/settings", "/cities"], requirePermission("settings"));
+adminRouter.use(["/deliveries", "/sub-orders"], requirePermission("deliveries"));
+// /staff checks its own rules (managers may handle delivery handlers only) and /search trims its results to what they may open.
+
 adminRouter.use("/vendors", adminVendorsRouter);
 adminRouter.use("/vendors", adminVendorMessagesRouter);
 adminRouter.use("/staff", adminStaffRouter);

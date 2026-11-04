@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ok } from "../../utils/respond.js";
+import { hasPermission } from "../../domain/permissions.js";
 import { escapeRegex } from "../../utils/zodCommon.js";
 import { Order } from "../../models/Order.js";
 import { Payout } from "../../models/Payout.js";
@@ -20,11 +21,14 @@ adminSearchRouter.get(
   validate({ query: z.object({ q: z.string().trim().min(2, "Type at least 2 characters").max(100) }) }),
   asyncHandler(async (req, res) => {
     const rx = new RegExp(escapeRegex(req.validated.query.q), "i");
+    // Staff only find what they may open: a customer support account gets no payouts, a finance manager no customers.
+    const may = (p: Parameters<typeof hasPermission>[1]) => hasPermission(req.user!, p);
+    const none = Promise.resolve([] as never[]);
     const [orders, vendors, customers, payouts] = await Promise.all([
-      Order.find({ $or: [{ orderNumber: rx }, { "customer.name": rx }, { "customer.email": rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
-      Vendor.find({ $or: [{ businessName: rx }, { email: rx }, { ownerName: rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
-      User.find({ role: "CUSTOMER", $or: [{ name: rx }, { email: rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
-      Payout.find({ number: rx }).sort({ requestedAt: -1 }).limit(PER_KIND),
+      !may("orders") ? none : Order.find({ $or: [{ orderNumber: rx }, { "customer.name": rx }, { "customer.email": rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
+      !may("vendors") ? none : Vendor.find({ $or: [{ businessName: rx }, { email: rx }, { ownerName: rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
+      !may("customers") ? none : User.find({ role: "CUSTOMER", $or: [{ name: rx }, { email: rx }] }).sort({ createdAt: -1 }).limit(PER_KIND),
+      !may("payouts") ? none : Payout.find({ number: rx }).sort({ requestedAt: -1 }).limit(PER_KIND),
     ]);
 
     const payoutVendors = await Vendor.find({ _id: { $in: payouts.map((p) => p.vendorId) } }).select("businessName");
