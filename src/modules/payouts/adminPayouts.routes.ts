@@ -10,6 +10,7 @@ import { objectId, pagination } from "../../utils/zodCommon.js";
 import { Payout, presentPayout, type PayoutDoc } from "../../models/Payout.js";
 import { SubOrder } from "../../models/SubOrder.js";
 import { Vendor } from "../../models/Vendor.js";
+import { lagosRange, MAX_EXPORT_DAYS, payoutCsv } from "../../domain/payoutExport.js";
 import { declinePayout, payPayout } from "./payouts.service.js";
 
 // Mounted under /api/admin/payouts, behind requireRole("ADMIN").
@@ -37,6 +38,63 @@ adminPayoutsRouter.get(
       Promise.all(PAYOUT_STATUSES.map(async (s) => [s, await Payout.countDocuments({ status: s })] as const)),
     ]);
     ok(res, { counts: Object.fromEntries(counts), payouts: await listRows(rows) }, { page, limit, total });
+  }),
+);
+
+// The bank instruction file. The person in charge picks the days (on the Lagos clock, both included) and which payouts, and
+// downloads a CSV with the account to pay, the amount and a narration, one row per payout. Requested date is what is filtered.
+const exportQuery = z.object({
+  from: z.string().min(1, "Choose the first day"),
+  to: z.string().min(1, "Choose the last day"),
+  status: z.enum([...PAYOUT_STATUSES, "ALL"]).default("REQUESTED"),
+});
+const EXPORT_LIMIT = 5000;
+
+async function exportRows(query: z.infer<typeof exportQuery>) {
+  const range = lagosRange(query.from, query.to);
+  if (!range) {
+    throw AppError.validation("Choose real days, with the first day not after the last, and no more than a year apart", [
+      { path: "from", message: `Pick a first and last day, at most ${MAX_EXPORT_DAYS} days apart` },
+    ]);
+  }
+  const filter = { requestedAt: { $gte: range.start, $lt: range.end }, ...(query.status === "ALL" ? {} : { status: query.status }) };
+  const payouts = await Payout.find(filter).sort({ requestedAt: 1 }).limit(EXPORT_LIMIT + 1);
+  if (payouts.length > EXPORT_LIMIT) throw AppError.validation(`That is more than ${EXPORT_LIMIT} payouts. Choose a shorter range.`, [{ path: "from", message: "Choose a shorter range" }]);
+  const vendors = await Vendor.find({ _id: { $in: payouts.map((p) => p.vendorId) } }).select("businessName");
+  const name = new Map(vendors.map((v) => [String(v._id), v.businessName]));
+  return payouts.map((p) => ({
+    number: p.number,
+    vendor: name.get(String(p.vendorId)) ?? "Vendor",
+    bankName: p.bank!.bankName,
+    accountNumber: p.bank!.accountNumber,
+    accountName: p.bank!.accountName,
+    amountKobo: p.amountKobo,
+    requestedAt: p.requestedAt,
+    status: p.status,
+  }));
+}
+
+/** How many payouts and how much the file would hold, so the person can check before downloading. */
+adminPayoutsRouter.get(
+  "/export/summary",
+  validate({ query: exportQuery }),
+  asyncHandler(async (req, res) => {
+    const rows = await exportRows(req.validated.query as z.infer<typeof exportQuery>);
+    ok(res, { count: rows.length, totalKobo: rows.reduce((n, r) => n + r.amountKobo, 0) });
+  }),
+);
+
+adminPayoutsRouter.get(
+  "/export",
+  validate({ query: exportQuery }),
+  asyncHandler(async (req, res) => {
+    const q = req.validated.query as z.infer<typeof exportQuery>;
+    const rows = await exportRows(q);
+    console.info(`Admin ${req.user!._id} exported ${rows.length} ${q.status} payouts from ${q.from} to ${q.to}`);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="vendramart-payouts-${q.from}-to-${q.to}.csv"`);
+    res.setHeader("Cache-Control", "no-store"); // it holds bank account numbers
+    res.send(payoutCsv(rows));
   }),
 );
 
