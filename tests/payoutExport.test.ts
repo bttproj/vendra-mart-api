@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { csvCell, isCalendarDay, lagosDay, lagosRange, nairaText, payoutCsv, PAYOUT_EXPORT_HEADER } from "../src/domain/payoutExport.js";
+import type { Types } from "mongoose";
 import { Payout } from "../src/models/Payout.js";
 import { api, clearDb, createCustomer, createVendor, seedReferenceData, startDb, stopDb } from "./helpers.js";
 import { asUser, createAdmin } from "./fulfilmentHelpers.js";
@@ -63,7 +64,7 @@ beforeEach(async () => {
   await seedReferenceData();
 });
 
-async function makePayout(number: string, vendorId: unknown, userId: unknown, over: Record<string, unknown> = {}) {
+async function makePayout(number: string, vendorId: Types.ObjectId, userId: Types.ObjectId, over: Record<string, unknown> = {}) {
   return Payout.create({
     number,
     vendorId,

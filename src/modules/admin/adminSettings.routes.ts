@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { calculateDeliveryFee } from "../../domain/deliveryFee.js";
+import { calculateDeliveryFee, ratesForCity } from "../../domain/deliveryFee.js";
 import { percentOf } from "../../domain/money.js";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -42,7 +42,14 @@ async function present() {
     pricing,
     vendorRules: { requireNin },
     updatedAt: doc?.updatedAt ?? null,
-    cities: cities.map((c) => ({ ...publicCity(c), vendorCount: byCity.get(String(c._id)) ?? 0 })),
+    cities: cities.map((c) => ({
+      ...publicCity(c),
+      vendorCount: byCity.get(String(c._id)) ?? 0,
+      // The city's own fares (null = the platform price above) and what customers there are actually charged.
+      pricePerKmKobo: c.pricePerKmKobo ?? null,
+      minDeliveryFeeKobo: c.minDeliveryFeeKobo ?? null,
+      effective: ratesForCity(pricing, c),
+    })),
   };
 }
 
@@ -89,6 +96,28 @@ adminSettingsRouter.post(
       commissionKobo,
       vendorEarningKobo: b.saleKobo - commissionKobo,
     });
+  }),
+);
+
+// A city's own delivery fares. null clears one so the city goes back to the platform price. A minimum of 0 means no minimum in that city.
+adminSettingsRouter.put(
+  "/cities/:id/pricing",
+  validate({
+    params: z.object({ id: objectId }),
+    body: z
+      .object({
+        pricePerKmKobo: kobo.max(MAX_PRICE_PER_KM_KOBO, "That price per km looks too high").nullable(),
+        minDeliveryFeeKobo: kobo.max(MAX_MIN_FEE_KOBO, "That minimum looks too high").nullable(),
+      })
+      .strict(),
+  }),
+  asyncHandler(async (req, res) => {
+    const city = await City.findById(req.validated.params.id);
+    if (!city) throw AppError.notFound("City not found");
+    city.pricePerKmKobo = req.validated.body.pricePerKmKobo;
+    city.minDeliveryFeeKobo = req.validated.body.minDeliveryFeeKobo;
+    await city.save();
+    ok(res, await present());
   }),
 );
 

@@ -1,5 +1,7 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from "mongoose";
 
+const isIntOrNull = { validator: (v: unknown) => v === null || v === undefined || Number.isInteger(v), message: "{PATH} must be a whole number or empty" };
+
 const citySchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -11,6 +13,9 @@ const citySchema = new Schema(
     },
     radiusKm: { type: Number, required: true, min: 1 },
     sortOrder: { type: Number, default: 0 },
+    // This city's own delivery fares, in kobo. Null means "use the platform price" set in the pricing form. A minimum of 0 means no minimum here.
+    pricePerKmKobo: { type: Number, min: 0, validate: isIntOrNull, default: null },
+    minDeliveryFeeKobo: { type: Number, min: 0, validate: isIntOrNull, default: null },
   },
   { timestamps: true },
 );

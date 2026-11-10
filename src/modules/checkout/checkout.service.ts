@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { calculateDeliveryFee, formatTenthsKm } from "../../domain/deliveryFee.js";
+import { calculateDeliveryFee, formatTenthsKm, ratesForCity } from "../../domain/deliveryFee.js";
 import { sumKobo } from "../../domain/money.js";
 import { lineTotalKobo, splitByVendor, type CartLine } from "../../domain/orderSplit.js";
 import { Address } from "../../models/Address.js";
@@ -50,7 +50,9 @@ export async function buildQuote(userId: Types.ObjectId, items: RequestedItem[],
     throw AppError.validation(`We cannot deliver across cities yet. ${elsewhere.map((v) => v.businessName).join(", ")} ships from another city than your address.`);
   }
 
-  const pricing = await getPricing();
+  // The city's own fares where the admin set them, the platform's where not. Everything below, and the order's snapshot, uses these.
+  const platform = await getPricing();
+  const pricing = { ...platform, ...ratesForCity(platform, city) };
   const provider = getDistanceProvider();
   const dropoff = { lat: address.location!.lat, lng: address.location!.lng };
 

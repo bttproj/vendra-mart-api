@@ -20,6 +20,22 @@ export interface FeeResult {
   feeKobo: Kobo;
 }
 
+export interface DeliveryRates {
+  pricePerKmKobo: Kobo;
+  minDeliveryFeeKobo: Kobo | null;
+}
+
+/**
+ * The rates that apply in one city: the city's own price per km and minimum where the admin set them, the platform's
+ * where it did not. Each value falls back on its own, so a city can have its own price per km but share the minimum.
+ */
+export function ratesForCity(platform: DeliveryRates, city?: { pricePerKmKobo?: Kobo | null; minDeliveryFeeKobo?: Kobo | null } | null): DeliveryRates {
+  return {
+    pricePerKmKobo: city?.pricePerKmKobo ?? platform.pricePerKmKobo,
+    minDeliveryFeeKobo: city?.minDeliveryFeeKobo ?? platform.minDeliveryFeeKobo,
+  };
+}
+
 /** Nearest 0.1 km, as tenths. 3149 m = 31 (3.1 km), 3150 m = 32 (3.2 km). */
 export function metersToTenthsKm(distanceMeters: number): number {
   if (!Number.isFinite(distanceMeters) || distanceMeters < 0) {
