@@ -10,6 +10,7 @@ import { kobo, objectId } from "../../utils/zodCommon.js";
 import { City, publicCity } from "../../models/City.js";
 import { Settings, getPricing, getRequireNin } from "../../models/Settings.js";
 import { Vendor } from "../../models/Vendor.js";
+import { checkDistanceService } from "../../services/distance/index.js";
 
 // Mounted under /api/admin, behind requireRole("ADMIN").
 export const adminSettingsRouter = Router();
@@ -63,6 +64,12 @@ adminSettingsRouter.put(
     await Settings.updateOne({ key: "singleton" }, { $set: { ...req.validated.body, updatedBy: req.user!._id } });
     ok(res, await present());
   }),
+);
+
+// Tries the distance service once, so a wrong Google key shows up here in plain words instead of as a failed checkout.
+adminSettingsRouter.post(
+  "/settings/check-distance",
+  asyncHandler(async (_req, res) => ok(res, await checkDistanceService())),
 );
 
 adminSettingsRouter.put(
