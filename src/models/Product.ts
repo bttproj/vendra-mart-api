@@ -17,6 +17,9 @@ const productSchema = new Schema(
     images: [{ _id: false, url: { type: String, required: true }, publicId: { type: String, required: true } }],
     isActive: { type: Boolean, default: true },
     soldCount: { type: Number, default: 0, min: 0, validate: isInt },
+    // Units the vendor has put up in all: the first stock plus what they added later. Missing on older products, which count
+    // as stock plus sold (see domain/stock.ts), so it needs no migration.
+    uploadedCount: { type: Number, min: 0, validate: isInt },
   },
   { timestamps: true },
 );

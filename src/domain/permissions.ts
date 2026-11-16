@@ -11,10 +11,10 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; hint: string
   orders: { label: "Orders", hint: "See orders and resolve the ones that need attention" },
   deliveries: { label: "Deliveries", hint: "Assign delivery handlers and move deliveries along" },
   handlers: { label: "Delivery handlers", hint: "Create and switch off delivery handler accounts" },
-  vendors: { label: "Vendors", hint: "Review, approve, suspend, message and create stores" },
+  vendors: { label: "Vendors", hint: "Review, approve, suspend, message and create stores, and see their products and stock" },
   customers: { label: "Customers", hint: "See customers and switch their accounts on or off" },
   payouts: { label: "Payouts", hint: "Pay vendors and decline payout requests" },
-  catalog: { label: "Categories and banners", hint: "Manage product categories and the home page banners" },
+  catalog: { label: "Categories and banners", hint: "Manage product categories and the home page banners, and see every store's products and stock" },
   settings: { label: "Pricing and rules", hint: "Price per km, commission, cities and vendor rules" },
 };
 

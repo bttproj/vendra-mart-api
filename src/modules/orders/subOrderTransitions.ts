@@ -2,6 +2,7 @@ import type { Types } from "mongoose";
 import { holdHasEnded, unlockedBefore } from "../../domain/earnings.js";
 import { assertTransition, TransitionError, type Actor, type OrderStatus } from "../../domain/orderStateMachine.js";
 import { Order } from "../../models/Order.js";
+import { Product } from "../../models/Product.js";
 import { StatusLog } from "../../models/StatusLog.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 import { AppError } from "../../utils/AppError.js";
@@ -78,6 +79,8 @@ export async function transitionSubOrder(subOrderId: unknown, to: OrderStatus, a
   if (to === "CANCELLED") {
     // The goods never left: put them back on the shelf. The customer already paid, so a human must refund.
     await releaseStock(updated.items.map((i) => ({ productId: String(i.productId), qty: i.qty })));
+    // ...and they no longer count as sold, so the admin's stock view keeps left plus sold equal to what was uploaded.
+    await Promise.allSettled(updated.items.map((i) => Product.updateOne({ _id: i.productId, soldCount: { $gte: i.qty } }, { $inc: { soldCount: -i.qty } })));
     await Order.updateOne(
       { _id: sub.orderId },
       {

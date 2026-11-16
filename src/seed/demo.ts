@@ -161,6 +161,7 @@ export async function seedDemoData(password: string): Promise<DemoResult> {
       priceKobo,
       stock,
       soldCount,
+      uploadedCount: stock + soldCount,
       images: photos.map(placeholderImage),
     });
     result.products++;

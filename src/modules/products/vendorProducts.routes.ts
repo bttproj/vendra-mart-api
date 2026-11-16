@@ -6,6 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 import { created, ok } from "../../utils/respond.js";
 import { escapeRegex } from "../../utils/zodCommon.js";
 import { uniqueSlug } from "../../utils/slug.js";
+import { uploadedAfterEdit, uploadedUnits } from "../../domain/stock.js";
 import { Category } from "../../models/Category.js";
 import { Product, type ProductDoc } from "../../models/Product.js";
 import type { VendorDoc } from "../../models/Vendor.js";
@@ -55,6 +56,7 @@ const present = (p: ProductDoc) => ({
   images: p.images.map((i) => ({ url: i.url, publicId: i.publicId })),
   isActive: p.isActive,
   soldCount: p.soldCount,
+  uploadedCount: uploadedUnits(p),
   createdAt: p.createdAt,
 });
 
@@ -96,6 +98,7 @@ vendorProductsRouter.post(
 
     const product = await Product.create({
       ...input,
+      uploadedCount: input.stock,
       vendorId: vendor._id,
       cityId: vendor.pickup!.cityId,
       slug: await uniqueSlug(Product, input.name),
@@ -128,6 +131,8 @@ vendorProductsRouter.patch(
     // Remove files that are no longer referenced (best effort, never blocks the save).
     const dropped = input.images ? product.images.filter((old) => !input.images!.some((n: { publicId: string }) => n.publicId === old.publicId)) : [];
 
+    // Adding stock adds to what was uploaded; a correction downwards takes from it. Worked out before the stock is overwritten.
+    if (input.stock !== undefined && input.stock !== product.stock) product.uploadedCount = uploadedAfterEdit(product, input.stock);
     Object.assign(product, input);
     await product.save();
     for (const img of dropped) removeStored(img.publicId);
