@@ -35,6 +35,13 @@ export async function visibleVendors(opts: { city?: string; vendorSlug?: string;
   return Vendor.find(filter);
 }
 
+/** The name of the city each store is in, by the store's id, for showing "Ibadan" beside a store. */
+export async function cityNames(vendors: VendorDoc[]): Promise<Map<string, string>> {
+  const cities = await City.find({ _id: { $in: [...new Set(vendors.map((v) => String(v.pickup!.cityId)))] } }).select("name");
+  const byId = new Map(cities.map((c) => [String(c._id), c.name]));
+  return new Map(vendors.map((v) => [String(v._id), byId.get(String(v.pickup!.cityId)) ?? ""]).filter(([, name]) => name) as [string, string][]);
+}
+
 const SORTS: Record<CatalogFilter["sort"], Record<string, SortOrder>> = {
   newest: { createdAt: -1 },
   popular: { soldCount: -1, createdAt: -1 },
@@ -132,6 +139,8 @@ export async function homeData(city?: string) {
     vendors.length ? Product.find(base).sort(SORTS.popular).limit(60) : [],
   ]);
   const storeCards = await toCards(storeProducts);
+  const shownStores = vendors.slice(0, 6);
+  const storeCities = await cityNames(shownStores);
 
   return {
     categories: categories.map(publicCategory),
@@ -140,8 +149,8 @@ export async function homeData(city?: string) {
     categoryRows: (
       await Promise.all(featured.map(async (c, i) => ({ category: { slug: c.slug, name: c.name }, products: await toCards(rows[i]!) })))
     ).filter((r) => r.products.length >= MIN_ROW_PRODUCTS),
-    stores: vendors.slice(0, 6).map((v) => ({
-      ...publicVendor(v),
+    stores: shownStores.map((v) => ({
+      ...publicVendor(v, storeCities.get(String(v._id))),
       photos: storeCards.filter((p) => p.vendor.slug === v.slug && p.image).slice(0, 3).map((p) => p.image as string),
     })),
   };
@@ -153,6 +162,7 @@ export async function productDetail(slug: string) {
   const [vendors, category] = await Promise.all([visibleVendors({}), Category.findById(product.categoryId)]);
   const vendor = vendors.find((v) => String(v._id) === String(product.vendorId));
   if (!vendor) return null; // vendor not approved, suspended, or city not live
+  const cityName = (await cityNames([vendor])).get(String(vendor._id)) ?? null;
   return {
     ...presentCard(product, vendor, category ?? undefined),
     description: product.description,
@@ -162,7 +172,7 @@ export async function productDetail(slug: string) {
       slug: vendor.slug,
       businessName: vendor.businessName,
       description: vendor.description ?? null,
-      pickupArea: vendor.pickup!.line,
+      cityName,
     },
   };
 }

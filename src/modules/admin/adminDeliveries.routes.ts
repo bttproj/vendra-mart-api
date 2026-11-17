@@ -1,14 +1,17 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { OrderStatus } from "../../domain/orderStateMachine.js";
+import { requireSuperAdmin } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { escapeRegex, objectId, pagination } from "../../utils/zodCommon.js";
+import { getAutoAssign, getPricing, Settings } from "../../models/Settings.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 import { User } from "../../models/User.js";
 import { Vendor } from "../../models/Vendor.js";
+import { autoAssignWaiting, handlerLoads } from "../orders/autoAssign.js";
 import { notifySubOrderEvent } from "../orders/orderEvents.js";
 import { transitionSubOrder } from "../orders/subOrderTransitions.js";
 
@@ -81,7 +84,32 @@ adminDeliveriesRouter.get(
         }),
       ),
     ]);
-    ok(res, { counts: Object.fromEntries(counts), deliveries: await present(subs) }, { page, limit, total });
+    ok(res, { counts: Object.fromEntries(counts), autoAssign: await getAutoAssign(), deliveries: await present(subs) }, { page, limit, total });
+  }),
+);
+
+// The "Choose a handler" list: delivery handlers only (never administrators), active ones, with what each is carrying now.
+// Its own route, so a person who may open deliveries does not also need the staff area to assign one.
+adminDeliveriesRouter.get(
+  "/deliveries/handlers",
+  asyncHandler(async (_req, res) => {
+    const loads = await handlerLoads();
+    ok(res, loads.map((l) => ({ id: String(l.handler._id), name: l.handler.name, openDeliveries: l.open })));
+  }),
+);
+
+// Automatic or manual assignment, switched by the super admin like the NIN rule. Switching it on also gives the deliveries
+// already waiting for a handler to one, so nothing is left behind.
+adminDeliveriesRouter.put(
+  "/deliveries/assignment",
+  requireSuperAdmin,
+  validate({ body: z.object({ autoAssign: z.boolean() }).strict() }),
+  asyncHandler(async (req, res) => {
+    const { autoAssign } = req.validated.body;
+    await getPricing(); // make sure the settings document exists
+    await Settings.updateOne({ key: "singleton" }, { $set: { autoAssignHandlers: autoAssign, updatedBy: req.user!._id } });
+    const assignedNow = autoAssign ? await autoAssignWaiting() : 0;
+    ok(res, { autoAssign, assignedNow });
   }),
 );
 

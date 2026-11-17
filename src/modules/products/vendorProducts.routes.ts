@@ -6,8 +6,10 @@ import { AppError } from "../../utils/AppError.js";
 import { created, ok } from "../../utils/respond.js";
 import { escapeRegex } from "../../utils/zodCommon.js";
 import { uniqueSlug } from "../../utils/slug.js";
+import { calculateLineEarnings } from "../../domain/commission.js";
 import { uploadedAfterEdit, uploadedUnits } from "../../domain/stock.js";
 import { Category } from "../../models/Category.js";
+import { getPricing } from "../../models/Settings.js";
 import { Product, type ProductDoc } from "../../models/Product.js";
 import type { VendorDoc } from "../../models/Vendor.js";
 import { getImageStorage } from "../../services/storage/index.js";
@@ -45,7 +47,8 @@ async function assertCategory(id: string) {
   }
 }
 
-const present = (p: ProductDoc) => ({
+/** `bps` is the service fee VendraMart keeps, so the vendor sees both the fee and what they receive for one item. */
+const present = (p: ProductDoc, bps: number) => ({
   id: String(p._id),
   slug: p.slug,
   name: p.name,
@@ -55,6 +58,8 @@ const present = (p: ProductDoc) => ({
   stock: p.stock,
   images: p.images.map((i) => ({ url: i.url, publicId: i.publicId })),
   isActive: p.isActive,
+  serviceFeeKobo: calculateLineEarnings(p.priceKobo, 1, bps).commissionKobo,
+  youReceiveKobo: calculateLineEarnings(p.priceKobo, 1, bps).vendorEarningKobo,
   soldCount: p.soldCount,
   uploadedCount: uploadedUnits(p),
   createdAt: p.createdAt,
@@ -82,7 +87,8 @@ vendorProductsRouter.get(
         .limit(limit),
       Product.countDocuments(filter),
     ]);
-    ok(res, items.map(present), { page, limit, total });
+    const { commissionBps } = await getPricing();
+    ok(res, items.map((p) => present(p, commissionBps)), { page, limit, total });
   }),
 );
 
@@ -103,7 +109,7 @@ vendorProductsRouter.post(
       cityId: vendor.pickup!.cityId,
       slug: await uniqueSlug(Product, input.name),
     });
-    created(res, present(product));
+    created(res, present(product, (await getPricing()).commissionBps));
   }),
 );
 
@@ -112,7 +118,7 @@ vendorProductsRouter.get(
   validate({ params: idParams }),
   asyncHandler(async (req, res) => {
     const vendor = await getVendorForUser(req.user!._id);
-    ok(res, present(await ownProduct(vendor, req.validated.params.id)));
+    ok(res, present(await ownProduct(vendor, req.validated.params.id), (await getPricing()).commissionBps));
   }),
 );
 
@@ -136,7 +142,7 @@ vendorProductsRouter.patch(
     Object.assign(product, input);
     await product.save();
     for (const img of dropped) removeStored(img.publicId);
-    ok(res, present(product));
+    ok(res, present(product, (await getPricing()).commissionBps));
   }),
 );
 

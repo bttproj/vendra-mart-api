@@ -6,7 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { publicVendor } from "../../models/Vendor.js";
 import { catalogQuery } from "./product.schemas.js";
-import { homeData, productDetail, searchProducts, visibleVendors } from "./catalog.service.js";
+import { cityNames, homeData, productDetail, searchProducts, visibleVendors } from "./catalog.service.js";
 
 // Public, no login. Everything here goes through visibleVendors(), so unapproved stores never leak.
 export const catalogRouter = Router();
@@ -43,7 +43,8 @@ catalogRouter.get(
   asyncHandler(async (req, res) => {
     const { q, city } = req.validated.query;
     const vendors = await visibleVendors({ city, nameQuery: q });
-    ok(res, vendors.map(publicVendor));
+    const cities = await cityNames(vendors);
+    ok(res, vendors.map((v) => publicVendor(v, cities.get(String(v._id)))));
   }),
 );
 
@@ -53,6 +54,6 @@ catalogRouter.get(
   asyncHandler(async (req, res) => {
     const [vendor] = await visibleVendors({ vendorSlug: req.validated.params.slug });
     if (!vendor) throw AppError.notFound("Store not found");
-    ok(res, publicVendor(vendor));
+    ok(res, publicVendor(vendor, (await cityNames([vendor])).get(String(vendor._id))));
   }),
 );

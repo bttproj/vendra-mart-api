@@ -63,7 +63,7 @@ export async function buildQuote(userId: Types.ObjectId, items: RequestedItem[],
       const meters = await provider.driveDistanceMeters(pickup, dropoff);
       const fee = calculateDeliveryFee({ distanceMeters: meters, pricePerKmKobo: pricing.pricePerKmKobo, minFeeKobo: pricing.minDeliveryFeeKobo });
       return {
-        vendor: { id: group.vendorId, slug: vendor.slug, businessName: vendor.businessName, pickupLine: vendor.pickup!.line },
+        vendor: { id: group.vendorId, slug: vendor.slug, businessName: vendor.businessName },
         pickup: { line: vendor.pickup!.line, lat: pickup.lat, lng: pickup.lng },
         items: group.lines.map((l) => ({
           productId: l.productId,

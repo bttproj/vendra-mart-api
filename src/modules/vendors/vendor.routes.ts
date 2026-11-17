@@ -1,9 +1,12 @@
 import { Router } from "express";
+import { z } from "zod";
+import { calculateLineEarnings } from "../../domain/commission.js";
 import { requireRole } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ok } from "../../utils/respond.js";
 import { Product } from "../../models/Product.js";
+import { getPricing } from "../../models/Settings.js";
 import { ownVendor } from "../../models/Vendor.js";
 import { getVendorForUser, updatePickup } from "./vendor.service.js";
 import { updateBankSchema, updateNinSchema, updatePickupSchema, updateProfileSchema } from "./vendor.schemas.js";
@@ -20,6 +23,20 @@ export const vendorRouter = Router();
 vendorRouter.use(requireRole("VENDOR"));
 
 vendorRouter.get("/ping", (req, res) => ok(res, { area: "vendor", userId: String(req.user!._id) }));
+
+// The service fee VendraMart keeps from each sale, so a vendor knows what they will receive. With ?priceKobo= it also works out
+// the fee and the amount received for one item at that price, with the same function orders use. Only vendors can ask.
+vendorRouter.get(
+  "/fees",
+  validate({ query: z.object({ priceKobo: z.coerce.number().int().min(0).max(10_000_000_000).optional() }) }),
+  asyncHandler(async (req, res) => {
+    const { commissionBps } = await getPricing();
+    const { priceKobo } = req.validated.query as { priceKobo?: number };
+    if (priceKobo === undefined || priceKobo < 1) return ok(res, { serviceFeeBps: commissionBps });
+    const { commissionKobo, vendorEarningKobo } = calculateLineEarnings(priceKobo, 1, commissionBps);
+    ok(res, { serviceFeeBps: commissionBps, priceKobo, serviceFeeKobo: commissionKobo, youReceiveKobo: vendorEarningKobo });
+  }),
+);
 
 vendorRouter.get(
   "/overview",

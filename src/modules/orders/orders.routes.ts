@@ -101,7 +101,6 @@ ordersRouter.get(
         itemsTotalKobo: s.itemsTotalKobo,
         // Commission and vendor earnings are not the customer's business.
         delivery: {
-          pickupLine: s.delivery!.pickup!.line,
           distanceKm: (Math.round(s.delivery!.distanceMeters / 100) / 10).toFixed(1),
           pricePerKmKobo: s.delivery!.pricePerKmKobo,
           feeKobo: s.delivery!.feeKobo,

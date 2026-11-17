@@ -6,6 +6,7 @@ import { Product } from "../../models/Product.js";
 import { StatusLog } from "../../models/StatusLog.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 import { AppError } from "../../utils/AppError.js";
+import { autoAssign } from "./autoAssign.js";
 import { notifySubOrderEvent, type SubOrderEvent } from "./orderEvents.js";
 import { releaseStock } from "./orders.service.js";
 
@@ -90,9 +91,16 @@ export async function transitionSubOrder(subOrderId: unknown, to: OrderStatus, a
     );
   }
 
+  // A delivery that reaches "ready" with no handler (none was free or created when it was paid) gets one now if automatic
+  // assignment is on, so the ready notice goes to the handler instead of asking the admin to find one.
+  let current = updated;
+  if (to === "READY_FOR_PICKUP" && !updated.handlerId) {
+    current = (await autoAssign(updated._id).catch((err) => (console.error(`Could not auto-assign ${updated.ref}:`, err), null))) ?? updated;
+  }
+
   const event = EVENT_FOR[to];
-  if (event) await notifySubOrderEvent(updated, event, { actorId: actor.userId ? String(actor.userId) : undefined, reason: updated.failureReason ?? undefined });
-  return updated;
+  if (event) await notifySubOrderEvent(current, event, { actorId: actor.userId ? String(actor.userId) : undefined, reason: current.failureReason ?? undefined });
+  return current;
 }
 
 /**

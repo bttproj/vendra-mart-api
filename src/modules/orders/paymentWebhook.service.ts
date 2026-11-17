@@ -4,6 +4,7 @@ import { StatusLog } from "../../models/StatusLog.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 import { WebhookEvent } from "../../models/WebhookEvent.js";
 import { getPaymentGateway, getWebhookSecret } from "../../services/payments/index.js";
+import { autoAssign } from "./autoAssign.js";
 import { notifyOrderPaid } from "./orderEvents.js";
 import { isValidSignature } from "../../services/payments/signature.js";
 
@@ -144,4 +145,6 @@ async function finalizePaidOrder(order: OrderDoc): Promise<void> {
   }
   // Told once, by whichever call actually moved the sub-orders, so a replay cannot notify twice.
   if (movedSubs.length) await notifyOrderPaid(order, movedSubs);
+  // With automatic assignment on, each paid delivery goes straight to a handler. A failure here must never undo or fail the payment.
+  for (const sub of movedSubs) await autoAssign(sub._id).catch((err) => console.error(`Could not auto-assign ${sub.ref}:`, err));
 }

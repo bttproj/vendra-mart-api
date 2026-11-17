@@ -55,15 +55,15 @@ export const maskAccount = (n: string) => `•••• ${n.slice(-4)}`;
 /** Only the last four digits of a NIN are ever shown back to the vendor. */
 export const maskNin = (n: string) => `*******${n.slice(-4)}`;
 
-/** What the public storefront may see. Never bank details, CAC number, phone or email. */
-export const publicVendor = (v: VendorDoc) => ({
+/** What the public storefront may see: the city the store is in, but never bank details, CAC number, phone, email or its address. */
+export const publicVendor = (v: VendorDoc, cityName?: string | null) => ({
   id: String(v._id),
   slug: v.slug,
   businessName: v.businessName,
   description: v.description ?? null,
   logo: v.logo ?? null,
   cityId: String(v.pickup!.cityId),
-  pickupArea: v.pickup!.line,
+  cityName: cityName ?? null,
 });
 
 /** The vendor's own view of their profile. Bank account number is masked. */

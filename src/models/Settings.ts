@@ -17,6 +17,8 @@ const settingsSchema = new Schema(
     commissionBps: { type: Number, required: true, min: 0, max: 10000, validate: isInt, default: 1000 },
     // Whether a vendor must give a NIN to register. The admin can switch this off; the NIN is then optional until it is switched on again.
     requireNin: { type: Boolean, default: true },
+    // Whether paid deliveries are given to a delivery handler automatically. Off: the admin picks the handler for each one.
+    autoAssignHandlers: { type: Boolean, default: false },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true },
@@ -36,6 +38,12 @@ export interface PricingSettings {
 export async function getRequireNin(): Promise<boolean> {
   const doc = await Settings.findOne({ key: "singleton" });
   return doc?.requireNin ?? true;
+}
+
+/** Are deliveries given to a handler automatically right now? Off unless the super admin has switched it on. */
+export async function getAutoAssign(): Promise<boolean> {
+  const doc = await Settings.findOne({ key: "singleton" });
+  return doc?.autoAssignHandlers ?? false;
 }
 
 /** Reads the pricing, creating the defaults (N200 per km, no minimum, 10%) on first use. Safe under concurrency. */
