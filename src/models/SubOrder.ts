@@ -54,6 +54,11 @@ const subOrderSchema = new Schema(
     payoutId: { type: Schema.Types.ObjectId, ref: "Payout", index: true },
     payoutLockedAt: Date,
     failureReason: String,
+    // A return or problem report on this delivery is open: its earnings stay on hold until it is settled.
+    returnHold: { type: Boolean, default: false },
+    // Earnings taken off by refunds (the vendor's share of what was refunded). The earnings the vendor gets are
+    // vendorEarningKobo minus this.
+    returnedEarningKobo: { type: Number, default: 0, min: 0, validate: isInt },
   },
   { timestamps: true },
 );

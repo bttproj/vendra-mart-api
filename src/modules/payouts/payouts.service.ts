@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { assertPayoutTransition, PayoutTransitionError } from "../../domain/payoutStateMachine.js";
 import { sumKobo } from "../../domain/money.js";
+import { netEarningKobo } from "../../domain/returns.js";
 import { nextSeq } from "../../models/Counter.js";
 import { Payout, type PayoutDoc } from "../../models/Payout.js";
 import { SubOrder } from "../../models/SubOrder.js";
@@ -56,12 +57,15 @@ export async function requestPayout(vendor: VendorDoc, user: UserDoc, now = new 
 
     try {
       const claimed = await SubOrder.find({ payoutId });
+      // Refunds can take a delivery's earnings down to nothing: there is then nothing to pay out for it.
+      const amountKobo = sumKobo(claimed.map((s) => netEarningKobo(s.vendorEarningKobo, s.returnedEarningKobo)));
+      if (amountKobo < 1) throw AppError.conflict("You have no earnings available to withdraw yet. Earnings unlock 4 working days after delivery.");
       const payout = await Payout.create({
         _id: payoutId,
         number: `PR-${await nextSeq("payout", PAYOUT_NUMBER_START)}`,
         vendorId: vendor._id,
         requestedBy: user._id,
-        amountKobo: sumKobo(claimed.map((s) => s.vendorEarningKobo)),
+        amountKobo,
         subOrderIds: claimed.map((s) => s._id),
         bank: { bankName: vendor.bank!.bankName, accountNumber: vendor.bank!.accountNumber, accountName: vendor.bank!.accountName },
         requestedAt: now,

@@ -21,19 +21,25 @@ const isWeekend = (lagosClockMs: number) => {
   return day === 0 || day === 6;
 };
 
-/** The exact moment earnings unlock: deliveredAt plus 4 working days, at the same time of day. */
-export function holdEndsAt(deliveredAt: Date): Date {
-  let t = toLagosClock(deliveredAt);
+/**
+ * `days` working days after `from`, at the same time of day, counting Monday to Friday in Lagos time. A start on a Saturday
+ * or Sunday counts as the start of Monday. Also used for the refund deadline of a return.
+ */
+export function addWorkingDays(from: Date, days: number): Date {
+  let t = toLagosClock(from);
   const startOfDay = t - (((t % DAY_MS) + DAY_MS) % DAY_MS);
   const weekday = new Date(t).getUTCDay();
   if (weekday === 6) t = startOfDay + 2 * DAY_MS; // Saturday: counts as Monday 00:00
   else if (weekday === 0) t = startOfDay + DAY_MS; // Sunday: counts as Monday 00:00
-  for (let i = 0; i < HOLD_WORKING_DAYS; i++) {
+  for (let i = 0; i < days; i++) {
     t += DAY_MS;
     while (isWeekend(t)) t += DAY_MS;
   }
   return new Date(t - LAGOS_OFFSET_MS);
 }
+
+/** The exact moment earnings unlock: deliveredAt plus 4 working days, at the same time of day. */
+export const holdEndsAt = (deliveredAt: Date): Date => addWorkingDays(deliveredAt, HOLD_WORKING_DAYS);
 
 /** True once the hold has fully passed. At exactly the unlock moment it is true. */
 export const holdHasEnded = (deliveredAt: Date, now: Date): boolean => now.getTime() >= holdEndsAt(deliveredAt).getTime();
@@ -72,25 +78,32 @@ export interface EarningInput {
   status: OrderStatus;
   deliveredAt?: Date | null;
   payoutStatus?: PayoutLink;
+  /** A return or problem report is open on this delivery. */
+  returnHold?: boolean;
 }
 
 export interface EarningResult {
   state: EarningState;
   /** Only for ON_HOLD. */
   unlocksAt?: Date;
+  /** ON_HOLD because a return is open, not because of the 4 working days: there is no unlock date until it is settled. */
+  heldForReturn?: boolean;
 }
 
 const DELIVERED_STATES: OrderStatus[] = ["DELIVERED", "COMPLETED"];
 const NOT_YET_DELIVERED: OrderStatus[] = ["PAID", "READY_FOR_PICKUP", "PICKED_UP", "FAILED_DELIVERY"];
 
 /** Where one sub-order's earnings stand right now. Pure: same inputs, same answer. */
-export function earningState({ status, deliveredAt, payoutStatus }: EarningInput, now: Date): EarningResult {
+export function earningState({ status, deliveredAt, payoutStatus, returnHold }: EarningInput, now: Date): EarningResult {
   if (NOT_YET_DELIVERED.includes(status)) return { state: "AWAITING_DELIVERY" };
   if (!DELIVERED_STATES.includes(status)) return { state: "NONE" }; // PENDING_PAYMENT, CANCELLED
 
   // Delivered. A payout that is still open or already paid owns the money.
   if (payoutStatus === "PAID") return { state: "PAID" };
   if (payoutStatus === "REQUESTED") return { state: "REQUESTED" };
+
+  // An open return keeps the money on hold, however many days have passed, until the case is settled.
+  if (returnHold) return { state: "ON_HOLD", heldForReturn: true };
 
   // No delivery time on a delivered order would be a data fault; treat it as still on hold rather than pay out early.
   if (!deliveredAt) return { state: "ON_HOLD" };

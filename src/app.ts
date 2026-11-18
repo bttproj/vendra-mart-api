@@ -16,6 +16,8 @@ import { isProd } from "./config/env.js";
 import { devPaymentsRouter } from "./modules/orders/devPayments.routes.js";
 import { ordersRouter } from "./modules/orders/orders.routes.js";
 import { notificationsRouter } from "./modules/notifications/notifications.routes.js";
+import { reviewsRouter } from "./modules/reviews/reviews.routes.js";
+import { returnsRouter } from "./modules/returns/returns.routes.js";
 import { receiptRouter } from "./modules/payouts/receipt.routes.js";
 import { mountPaystackWebhook } from "./modules/orders/webhook.routes.js";
 import mongoose from "mongoose";
@@ -71,6 +73,8 @@ export function createApp() {
   api.use("/cart", cartRouter);
   api.use("/checkout", checkoutRouter);
   api.use("/orders", ordersRouter);
+  api.use("/reviews", reviewsRouter);
+  api.use("/returns", returnsRouter);
   api.use("/notifications", notificationsRouter);
   api.use("/payouts", receiptRouter);
   if (!isProd) api.use("/dev/paystack", devPaymentsRouter);

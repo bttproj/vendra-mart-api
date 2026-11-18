@@ -7,6 +7,7 @@ import { created, ok } from "../../utils/respond.js";
 import { escapeRegex } from "../../utils/zodCommon.js";
 import { uniqueSlug } from "../../utils/slug.js";
 import { calculateLineEarnings } from "../../domain/commission.js";
+import { ratingSummary } from "../../domain/rating.js";
 import { uploadedAfterEdit, uploadedUnits } from "../../domain/stock.js";
 import { Category } from "../../models/Category.js";
 import { getPricing } from "../../models/Settings.js";
@@ -61,6 +62,7 @@ const present = (p: ProductDoc, bps: number) => ({
   serviceFeeKobo: calculateLineEarnings(p.priceKobo, 1, bps).commissionKobo,
   youReceiveKobo: calculateLineEarnings(p.priceKobo, 1, bps).vendorEarningKobo,
   soldCount: p.soldCount,
+  rating: ratingSummary(p.ratingSum, p.ratingCount),
   uploadedCount: uploadedUnits(p),
   createdAt: p.createdAt,
 });

@@ -7,9 +7,15 @@ import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { objectId, pagination } from "../../utils/zodCommon.js";
 import { Order, type OrderDoc } from "../../models/Order.js";
+import { Product } from "../../models/Product.js";
+import { Review } from "../../models/Review.js";
 import { StatusLog } from "../../models/StatusLog.js";
 import { SubOrder } from "../../models/SubOrder.js";
 import { Vendor } from "../../models/Vendor.js";
+import { OPEN_RETURN_STATUSES, canLodge, lodgeDeadline } from "../../domain/returns.js";
+import { ReturnRequest } from "../../models/ReturnRequest.js";
+import { presentReturn } from "../returns/returns.present.js";
+import { REVIEWABLE_STATUSES } from "../reviews/reviews.service.js";
 import { expireIfStale } from "./orders.service.js";
 
 // Customers only, and every query is scoped to the signed-in customer's own orders.
@@ -89,6 +95,23 @@ ordersRouter.get(
     ]);
     const vendorById = new Map(vendors.map((v) => [String(v._id), v]));
 
+    // Which of these products the customer has already reviewed, and which still exist to be reviewed.
+    const productIds = [...new Set(subs.flatMap((s) => s.items.map((i) => String(i.productId))))];
+    const [reviews, products] = await Promise.all([
+      Review.find({ customerId: req.user!._id, productId: { $in: productIds } }),
+      Product.find({ _id: { $in: productIds } }).select("_id"),
+    ]);
+    const reviewOf = new Map(reviews.map((r) => [String(r.productId), r]));
+    const stillSold = new Set(products.map((p) => String(p._id)));
+
+    // The customer's returns and problem reports on this order, and which units of each item a refund has already covered.
+    const cases = await ReturnRequest.find({ customerId: req.user!._id, orderId: order._id }).sort({ createdAt: -1 });
+    const now = new Date();
+    const refundedQty = (subId: unknown, productId: unknown) =>
+      cases
+        .filter((c) => c.status === "COMPLETED" && String(c.subOrderId) === String(subId))
+        .reduce((n, c) => n + c.items.filter((i) => String(i.productId) === String(productId)).reduce((m, i) => m + i.qty, 0), 0);
+
     ok(res, {
       ...presentOrderBase(order),
       address: { label: order.deliveryAddress!.label ?? null, line: order.deliveryAddress!.line, landmark: order.deliveryAddress!.landmark ?? null, cityName: order.deliveryAddress!.cityName ?? null },
@@ -97,7 +120,22 @@ ordersRouter.get(
         ref: s.ref,
         status: s.status,
         vendor: { businessName: vendorById.get(String(s.vendorId))?.businessName ?? "Store", slug: vendorById.get(String(s.vendorId))?.slug ?? null },
-        items: s.items.map((i) => ({ productId: String(i.productId), name: i.name, image: i.image ?? null, qty: i.qty, unitPriceKobo: i.unitPriceKobo, lineTotalKobo: i.lineTotalKobo })),
+        items: s.items.map((i) => {
+          const review = reviewOf.get(String(i.productId));
+          return {
+            productId: String(i.productId),
+            name: i.name,
+            image: i.image ?? null,
+            qty: i.qty,
+            unitPriceKobo: i.unitPriceKobo,
+            lineTotalKobo: i.lineTotalKobo,
+            // Once the parcel is delivered the customer can rate it (once), as long as the product still exists.
+            review: review ? { id: String(review._id), rating: review.rating, comment: review.comment ?? "", status: review.status ?? "APPROVED" } : null,
+            canReview: !review && stillSold.has(String(i.productId)) && (REVIEWABLE_STATUSES as readonly string[]).includes(s.status),
+            // How many of these can still be returned (not already refunded).
+            returnableQty: i.qty - refundedQty(s._id, i.productId),
+          };
+        }),
         itemsTotalKobo: s.itemsTotalKobo,
         // Commission and vendor earnings are not the customer's business.
         delivery: {
@@ -108,6 +146,18 @@ ordersRouter.get(
         },
         deliveredAt: s.deliveredAt ?? null,
         failureReason: s.failureReason ?? null,
+        // Whether a return or problem report can be lodged for this delivery now: it has arrived, it is within 48 hours of
+        // that, and nothing is open on it already.
+        returnWindow: (() => {
+          const open = cases.some((c) => String(c.subOrderId) === String(s._id) && (OPEN_RETURN_STATUSES as readonly string[]).includes(c.status));
+          const arrived = (REVIEWABLE_STATUSES as readonly string[]).includes(s.status) && Boolean(s.deliveredAt);
+          return {
+            canLodge: arrived && !open && canLodge(s.deliveredAt!, now),
+            deadline: arrived ? lodgeDeadline(s.deliveredAt!) : null,
+            hasOpenCase: open,
+          };
+        })(),
+        returns: cases.filter((c) => String(c.subOrderId) === String(s._id)).map((c) => presentReturn(c, now)),
         timeline: logs.filter((l) => String(l.subOrderId) === String(s._id)).map((l) => ({ status: l.to, at: l.at, note: l.note ?? null })),
       })),
     });

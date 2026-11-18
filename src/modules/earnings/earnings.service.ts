@@ -1,6 +1,7 @@
 import type { Types } from "mongoose";
 import { earningState, unlockedBefore, type EarningResult, type EarningState } from "../../domain/earnings.js";
 import type { OrderStatus } from "../../domain/orderStateMachine.js";
+import { netEarningKobo } from "../../domain/returns.js";
 import { Payout } from "../../models/Payout.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 
@@ -26,6 +27,8 @@ export function availableFilter(vendorId: Types.ObjectId, now: Date, declined: T
     vendorId,
     status: { $in: DELIVERED_STATUSES },
     deliveredAt: { $lte: unlockedBefore(now) },
+    // An open return keeps the money back until the case is settled.
+    returnHold: { $ne: true },
     $or: [{ payoutId: null }, { payoutId: { $in: declined } }],
   };
 }
@@ -42,6 +45,8 @@ export interface EarningRow {
   earnKobo: number;
   state: EarningState;
   unlocksAt: Date | null;
+  /** On hold because a return or problem report is open on this delivery. */
+  heldForReturn: boolean;
 }
 
 export interface EarningsSummary {
@@ -72,9 +77,9 @@ export async function loadEarnings(vendorId: Types.ObjectId, now = new Date()) {
   const results = new Map<string, EarningResult>();
 
   for (const s of subs) {
-    const result = earningState({ status: s.status, deliveredAt: s.deliveredAt, payoutStatus: s.payoutId ? payoutStatus.get(String(s.payoutId)) : null }, now);
+    const result = earningState({ status: s.status, deliveredAt: s.deliveredAt, payoutStatus: s.payoutId ? payoutStatus.get(String(s.payoutId)) : null, returnHold: s.returnHold }, now);
     results.set(String(s._id), result);
-    const earn = s.vendorEarningKobo;
+    const earn = netEarningKobo(s.vendorEarningKobo, s.returnedEarningKobo); // after any refunds took their share off
     switch (result.state) {
       case "AVAILABLE": summary.availableKobo += earn; summary.availableOrders++; break;
       case "ON_HOLD":
@@ -108,6 +113,7 @@ export function toRows(subs: SubOrderDoc[], results: Map<string, EarningResult>)
       earnKobo: i.vendorEarningKobo,
       state: r.state,
       unlocksAt: r.unlocksAt ?? null,
+      heldForReturn: r.heldForReturn ?? false,
     }));
   });
 }

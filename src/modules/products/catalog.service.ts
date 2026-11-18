@@ -1,4 +1,5 @@
 import type { SortOrder } from "mongoose";
+import { ratingSummary } from "../../domain/rating.js";
 import { Category, publicCategory, type CategoryDoc } from "../../models/Category.js";
 import { City } from "../../models/City.js";
 import { Product, type ProductDoc } from "../../models/Product.js";
@@ -60,6 +61,8 @@ export function presentCard(p: ProductDoc, vendor: VendorDoc, category?: Categor
     image: p.images[0]?.url ?? productPlaceholder(category?.slug),
     vendor: { slug: vendor.slug, businessName: vendor.businessName },
     category: category ? { slug: category.slug, name: category.name } : null,
+    // Stars from customers who received it: the average to one decimal, and how many ratings it comes from.
+    rating: ratingSummary(p.ratingSum, p.ratingCount),
   };
 }
 

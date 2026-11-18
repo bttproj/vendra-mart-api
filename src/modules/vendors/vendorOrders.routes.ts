@@ -6,6 +6,7 @@ import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
 import { objectId, pagination } from "../../utils/zodCommon.js";
 import type { OrderStatus } from "../../domain/orderStateMachine.js";
+import { netEarningKobo } from "../../domain/returns.js";
 import { SubOrder, type SubOrderDoc } from "../../models/SubOrder.js";
 import { User } from "../../models/User.js";
 import { transitionSubOrder } from "../orders/subOrderTransitions.js";
@@ -44,6 +45,11 @@ async function present(subs: SubOrderDoc[]) {
     itemsTotalKobo: s.itemsTotalKobo,
     commissionTotalKobo: s.commissionTotalKobo,
     vendorEarningKobo: s.vendorEarningKobo,
+    // A return or problem report is open on this delivery, so its earnings stay on hold until it is settled.
+    returnHold: s.returnHold ?? false,
+    // Taken off by refunds, and what is left.
+    returnedEarningKobo: s.returnedEarningKobo ?? 0,
+    netEarningKobo: netEarningKobo(s.vendorEarningKobo, s.returnedEarningKobo),
     failureReason: s.failureReason ?? null,
   }));
 }

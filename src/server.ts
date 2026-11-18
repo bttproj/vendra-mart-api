@@ -10,6 +10,7 @@ import { WebhookEvent } from "./models/WebhookEvent.js";
 import { expireStaleOrders } from "./modules/orders/orders.service.js";
 import { seedReferenceData } from "./seed/reference.js";
 import { autoAssignWaiting } from "./modules/orders/autoAssign.js";
+import { flagOverdueReturns } from "./modules/returns/returns.service.js";
 import { completeDeliveredOrders } from "./modules/orders/subOrderTransitions.js";
 
 /** A live server must not start with an unsafe setting, and says plainly what is not set up yet. */
@@ -67,6 +68,8 @@ async function main() {
       expireStaleOrders().then((n) => n > 0 && console.log(`Expired ${n} unpaid order(s) and returned their stock`)),
       // Delivered orders become COMPLETED once their earnings hold has passed.
       completeDeliveredOrders().then((n) => n > 0 && console.log(`Completed ${n} delivered order(s) after the earnings hold`)),
+      // A confirmed return that was not refunded within its 7 working days is flagged to the team, once.
+      flagOverdueReturns().then((n) => n > 0 && console.log(`Flagged ${n} return(s) past their refund deadline`)),
       // With automatic assignment on, a paid delivery that found no handler is given one as soon as there is one.
       autoAssignWaiting().then((n) => n > 0 && console.log(`Gave ${n} waiting deliver${n === 1 ? "y" : "ies"} to a handler`)),
     ]).catch((err) => console.error("Order sweep failed:", err));

@@ -4,7 +4,11 @@ import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { AppError } from "../../utils/AppError.js";
 import { ok } from "../../utils/respond.js";
-import { publicVendor } from "../../models/Vendor.js";
+import { ratingSummary } from "../../domain/rating.js";
+import { Product } from "../../models/Product.js";
+import { APPROVED_FILTER, Review, publicReview } from "../../models/Review.js";
+import { publicVendor, Vendor } from "../../models/Vendor.js";
+import { ratingBreakdown, vendorRating } from "../reviews/reviews.service.js";
 import { catalogQuery } from "./product.schemas.js";
 import { cityNames, homeData, productDetail, searchProducts, visibleVendors } from "./catalog.service.js";
 
@@ -54,6 +58,30 @@ catalogRouter.get(
   asyncHandler(async (req, res) => {
     const [vendor] = await visibleVendors({ vendorSlug: req.validated.params.slug });
     if (!vendor) throw AppError.notFound("Store not found");
-    ok(res, publicVendor(vendor, (await cityNames([vendor])).get(String(vendor._id))));
+    ok(res, { ...publicVendor(vendor, (await cityNames([vendor])).get(String(vendor._id))), rating: await vendorRating(vendor._id) });
+  }),
+);
+
+// What customers who received a product said about it: the average, how many gave each number of stars, and the reviews
+// newest first. Public, with only a short name for each author.
+catalogRouter.get(
+  "/products/:slug/reviews",
+  validate({
+    params: z.object({ slug: z.string().trim().min(1).max(200) }),
+    query: z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(30).default(10) }),
+  }),
+  asyncHandler(async (req, res) => {
+    const product = await Product.findOne({ slug: req.validated.params.slug.toLowerCase(), isActive: true });
+    if (!product || !(await Vendor.exists({ _id: product.vendorId, status: "APPROVED" }))) throw AppError.notFound("Product not found");
+    const { page, limit } = req.validated.query as { page: number; limit: number };
+    const [items, total, breakdown] = await Promise.all([
+      Review.find({ productId: product._id, ...APPROVED_FILTER })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Review.countDocuments({ productId: product._id, ...APPROVED_FILTER }),
+      ratingBreakdown(product._id),
+    ]);
+    ok(res, { summary: { ...ratingSummary(product.ratingSum, product.ratingCount), breakdown }, reviews: items.map(publicReview) }, { page, limit, total });
   }),
 );

@@ -20,6 +20,10 @@ const productSchema = new Schema(
     // Units the vendor has put up in all: the first stock plus what they added later. Missing on older products, which count
     // as stock plus sold (see domain/stock.ts), so it needs no migration.
     uploadedCount: { type: Number, min: 0, validate: isInt },
+    // Customer ratings: how many, and the stars added up. The average is worked out from these (domain/rating.ts), so a new
+    // review is two increments, not a recount.
+    ratingCount: { type: Number, default: 0, min: 0, validate: isInt },
+    ratingSum: { type: Number, default: 0, min: 0, validate: isInt },
   },
   { timestamps: true },
 );

@@ -5,6 +5,8 @@ import { adminBannersRouter } from "./banners/banners.routes.js";
 import { adminCategoriesRouter } from "./admin/adminCategories.routes.js";
 import { adminDeleteRouter } from "./admin/adminDelete.routes.js";
 import { adminProductsRouter } from "./admin/adminProducts.routes.js";
+import { adminReviewsRouter } from "./admin/adminReviews.routes.js";
+import { adminReturnsRouter } from "./admin/adminReturns.routes.js";
 import { adminVendorsRouter } from "./vendors/adminVendors.routes.js";
 import { adminVendorMessagesRouter } from "./vendors/adminVendorMessages.routes.js";
 import { addressesRouter } from "./addresses/addresses.routes.js";
@@ -29,10 +31,10 @@ adminRouter.get("/ping", (req, res) => ok(res, { area: "admin", userId: String(r
 adminRouter.delete(["/customers/:id", "/vendors/:id", "/staff/:id"], requireSuperAdmin);
 adminRouter.use("/vendors", requirePermission("vendors"));
 adminRouter.use(["/banners", "/categories"], requirePermission("catalog"));
-adminRouter.use("/products", requirePermission("catalog", "vendors")); // stock and sold figures: the product and vendor managers
+adminRouter.use(["/products", "/reviews"], requirePermission("catalog", "vendors")); // stock and sold figures, and customer reviews: the product and vendor managers
 adminRouter.use("/payouts", requirePermission("payouts"));
 adminRouter.use("/overview", requirePermission("overview"));
-adminRouter.use("/orders", requirePermission("orders"));
+adminRouter.use(["/orders", "/returns"], requirePermission("orders")); // returns are settled by whoever handles orders and refunds
 adminRouter.use("/customers", requirePermission("customers"));
 adminRouter.use(["/settings", "/cities"], requirePermission("settings"));
 adminRouter.use(["/deliveries", "/sub-orders"], requirePermission("deliveries"));
@@ -44,6 +46,8 @@ adminRouter.use("/staff", adminStaffRouter);
 adminRouter.use("/banners", adminBannersRouter);
 adminRouter.use("/categories", adminCategoriesRouter);
 adminRouter.use("/products", adminProductsRouter);
+adminRouter.use("/reviews", adminReviewsRouter);
+adminRouter.use("/returns", adminReturnsRouter);
 adminRouter.use(adminDeleteRouter);
 adminRouter.use("/payouts", adminPayoutsRouter);
 adminRouter.use(adminOverviewRouter);

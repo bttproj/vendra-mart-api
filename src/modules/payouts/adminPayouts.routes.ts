@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { PAYOUT_STATUSES } from "../../domain/payoutStateMachine.js";
+import { netEarningKobo } from "../../domain/returns.js";
 import { singleFile } from "../../middleware/upload.js";
 import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
@@ -110,7 +111,7 @@ adminPayoutsRouter.get(
       vendor: { id: String(payout.vendorId), businessName: vendor?.businessName ?? "Vendor" },
       // The admin needs the full account number to make the transfer. This is the only place it is returned.
       bank: { bankName: payout.bank!.bankName, accountNumber: payout.bank!.accountNumber, accountName: payout.bank!.accountName },
-      orders: subs.map((s) => ({ id: String(s._id), ref: s.ref, deliveredAt: s.deliveredAt ?? null, earnKobo: s.vendorEarningKobo })),
+      orders: subs.map((s) => ({ id: String(s._id), ref: s.ref, deliveredAt: s.deliveredAt ?? null, earnKobo: netEarningKobo(s.vendorEarningKobo, s.returnedEarningKobo) })),
     });
   }),
 );
